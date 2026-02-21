@@ -108,14 +108,26 @@ Context로 토스트를 만들면 보통,
 - `setState`로 바꾸면 listeners를 깨웁니다.
 
 ```ts
-setState: (value) => {
-  const newState = typeof value === 'function' ? value(state) : value;
+export function createStore<TState>(initialState: TState): Store<TState> {
+  let state = initialState;
+  const listeners = new Set<StoreSubscriber>();
 
-  if (newState !== state) {
-    state = newState;
-    listeners.forEach((listener) => listener());
-  }
-};
+  return {
+    getState: () => state,
+    setState: (value) => {
+      const newState =
+        typeof value === 'function' ? (value as (prev: TState) => TState)(state) : value;
+      if (newState !== state) {
+        state = newState;
+        listeners.forEach((listener) => listener());
+      }
+    },
+    subscribe: (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+  };
+}
 ```
 
 토스트가 추가/삭제되는 순간에,
@@ -261,28 +273,113 @@ export const Toast: React.FC = () => {
 이렇게 딱 한 번만 렌더러를 배치하면,
 어느 페이지에서 `toast.success()`를 호출해도 동일하게 동작합니다.
 
-# 전체 실행 흐름 요약
+# 사용자 관점에서의 흐름
+
+이때까지 한 설명들을 이해하기 쉽게 사용자 관점에서 정리해보겠습니다.
+
+Toast 컴포넌트가 사용자의 화면에 렌더되는 순간은 다음과 같습니다.
+
+```ts
+export const Toast: React.FC = () => {
+  const { toasts: activeToasts } = useToasts();
+
+  if (activeToasts.length === 0) {
+    return null;
+  }
+
+  return createPortal(
+    <S.ToastContainer>
+      {activeToasts.map(item => (
+        <ToastItem key={item.id} toast={item} onClose={toast.dismiss} />
+      ))}
+    </S.ToastContainer>,
+    document.body,
+  );
+};
 
 ```
-[어디서든]
-toast.success("...") 호출
-      │
-      ▼
-addToast()
-toastStore.setState()
-      │
-      ▼
-listeners 실행 (구독자에게 알림)
-      │
-      ▼
-useSyncExternalStore가 <Toast /> 리렌더 트리거
-      │
-      ▼
-<Toast />가 최신 toasts 스냅샷 읽고 createPortal로 렌더
-      │
-      ▼
-(duration 후)
-removeToast() → setState() → 다시 리렌더 → 화면에서 제거
+
+위 코드를 보면, `activeToasts`를 불러올 때 `useToasts()` → `useStore()` → `useSyncExternalStore()` 흐름으로 호출이 이어집니다.
+
+이 순간 React가 하는 일은,  
+컴포넌트가 마운트될 때 `subscribe(reactInternalCallback)`를 호출하고 그 콜백을 `listeners`에 등록합니다.
+
+즉,
+
+`<Toast />`가 처음 화면에 렌더될 때 `subscribe`가 호출되고 `listeners.add(reactCallback)`가 실행됩니다.
+
+이전에 언급한 거와 같이 `<Toast />` 컴포넌트는 상위에 있는 `<Layout>` 컴포넌트에서 고정적으로 렌더되고 있기 때문에, 앱이 실행되는 동안 `<Toast />`는 계속 존재합니다.
+따라서 구독은 한 번만 일어나고 앱이 살아있는 동안 유지됩니다.
+
+토스트가 "보였다/사라졌다"는 건 뭘 의미하나?
+이 부분은 헷갈릴 수도 있는데, 구독과 다릅니다.
+
+위 코드에서 Toast 컴포넌트 내부에
+
+```tsx
+if (activeToasts.length === 0) {
+  return null;
+}
+```
+
+이 코드를 통해 알 수 있는건 UI를 안 그릴 뿐, 컴포넌트는 여전히 마운트 상태입니다.
+즉, 구독은 계속 유지되고 UI만 조건부로 렌더링되는 구조입니다.
+
+그럼 unsubscribe는 언제 되나? 라는 의문점이 생길 수 있습니다.
+
+이 글에서 초반에 설명드린 것과 같이 `subscribe`의 구조는,
+
+```ts
+subscribe: (callback) => {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+};
+```
+
+이렇게 구현되어 있기에 <Toast /> 컴포넌트가 언마운트될 때 React가 자동으로 `unsubscribe`를 호출하여 `listeners.delete(reactCallback)`이 실행됩니다.
+
+# 전체 생명주기 정리
+
+## 🟢 앱 시작
+
+```
+Layout 렌더
+→ <Toast /> 마운트
+→ subscribe 호출
+→ listeners.add(reactCallback)
+```
+
+## 🟢 토스트 호출
+
+```
+toast.success()
+→ setState()
+→ listeners.forEach()
+→ reactCallback 실행
+→ <Toast /> 리렌더
+→ 화면에 토스트 표시
+
+```
+
+## 🟢 토스트 제거
+
+```
+removeToast()
+→ setState()
+→ listeners.forEach()
+→ <Toast /> 리렌더
+→ 조건문 때문에 null 반환
+```
+
+- 컴포넌트는 그대로 있음
+
+## 🔴 만약 Layout에서 `<Toast />`를 제거하면?
+
+```
+컴포넌트 언마운트
+→ unsubscribe 실행
+→ listeners.delete(callback)
+→ 구독 해제
 ```
 
 # 구현하면서 느낀점
@@ -318,6 +415,10 @@ useSyncExternalStore의 "Sync"는, 필요하면 동기 렌더링으로 되돌아
 useTransition 같은 time slicing / transition UX에서 "useState처럼 자연스럽게 pending을 보여주는 경험"과 충돌할 수 있다라는 단점도 있을 수 있겠다는 생각이 들었습니다.
 
 # 마무리
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/39bf1ec5-c023-4bff-8124-d9691aec11c2/image.png)
+
+결론적으로, React Profiler 기준 렌더 시간 7.3ms → 1.8ms (약 75% 감소)가 실제로 측정되었고, 코드 라인 수는 60% 이상 줄어들었습니다.
 
 토스트는 "전역 상태"를 남용한 사례가 아니라,
 전역적으로 호출되어야 하는 UI 이벤트라는 특성상 "전역 큐"가 오히려 자연스러운 문제입니다.
