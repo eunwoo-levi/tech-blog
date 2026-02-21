@@ -336,7 +336,7 @@ subscribe: (callback) => {
 };
 ```
 
-이렇게 구현되어 있기에 <Toast /> 컴포넌트가 언마운트될 때 React가 자동으로 `unsubscribe`를 호출하여 `listeners.delete(reactCallback)`이 실행됩니다.
+이렇게 구현되어 있기에 `<Toast />` 컴포넌트가 언마운트될 때 React가 자동으로 `unsubscribe`를 호출하여 `listeners.delete(reactCallback)`이 실행됩니다.
 
 # 전체 생명주기 정리
 
@@ -344,7 +344,7 @@ subscribe: (callback) => {
 
 ```
 Layout 렌더
-→ <Toast /> 마운트
+→ `<Toast />` 마운트
 → subscribe 호출
 → listeners.add(reactCallback)
 ```
@@ -356,7 +356,7 @@ toast.success()
 → setState()
 → listeners.forEach()
 → reactCallback 실행
-→ <Toast /> 리렌더
+→ `<Toast />` 리렌더
 → 화면에 토스트 표시
 
 ```
@@ -367,7 +367,7 @@ toast.success()
 removeToast()
 → setState()
 → listeners.forEach()
-→ <Toast /> 리렌더
+→ `<Toast />` 리렌더
 → 조건문 때문에 null 반환
 ```
 
