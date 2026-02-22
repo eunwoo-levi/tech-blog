@@ -134,7 +134,7 @@ export default async function BlogDetailPage({ params }: ParamsProps) {
         type='application/ld+json'
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <article className='mx-auto min-w-0 max-w-7xl px-2 py-8 sm:px-4 sm:py-12'>
+      <article className='mx-auto min-w-0 max-w-4xl px-4 py-8 sm:px-6 sm:py-12'>
         <TableOfContents />
         <header className='mb-8 sm:mb-12'>
           <h1 className='mb-6 break-words text-2xl font-bold sm:mb-10 sm:text-4xl lg:text-6xl'>
@@ -161,7 +161,7 @@ export default async function BlogDetailPage({ params }: ParamsProps) {
         </header>
 
         <main
-          className='[&_a]:overflow-wrap-anywhere prose relative z-10 w-full min-w-0 max-w-full overflow-x-hidden break-words rounded-xl bg-white px-2 py-4 dark:prose-invert sm:prose-lg dark:text-white sm:px-5 sm:py-6 lg:px-14 [&>*]:max-w-full [&>*]:break-words [&_a]:break-all [&_code]:break-words [&_img]:mx-auto [&_img]:block [&_img]:!h-auto [&_img]:max-h-[600px] [&_img]:w-auto [&_img]:!max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto'
+          className='[&_a]:overflow-wrap-anywhere prose relative z-10 w-full min-w-0 max-w-full overflow-x-hidden break-words rounded-xl bg-white px-6 py-8 shadow-[0_4px_24px_rgba(0,0,0,0.07)] dark:prose-invert dark:ring-1 dark:ring-white/[0.07] dark:shadow-[0_4px_32px_rgba(0,0,0,0.5)] sm:prose-lg dark:text-white sm:px-10 sm:py-10 lg:px-14 lg:py-12 [&>*]:max-w-full [&>*]:break-words [&_a]:break-all [&_code]:break-words [&_img]:mx-auto [&_img]:block [&_img]:!h-auto [&_img]:max-h-[600px] [&_img]:w-auto [&_img]:!max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto'
           style={{ backgroundColor: 'var(--content-bg)' }}
         >
           {content}
