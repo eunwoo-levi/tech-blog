@@ -2,30 +2,25 @@ import { Mail, Github } from 'lucide-react';
 
 export default function ContactSection() {
   return (
-    <section className='border-t border-gray-800 px-6 py-20'>
-      <div className='mx-auto max-w-7xl text-center'>
-        <div className='mb-8 flex items-center justify-center gap-3'>
-          <Mail className='h-8 w-8 text-blue-400' />
-          <h2 className='text-4xl font-bold text-white'>Let&apos;s Connect</h2>
-        </div>
-        <p className='mb-8 text-xl text-gray-400'>
-          함께 멋진 서비스를 만들어가고 싶으시다면 편하게 언제든지 연락주세요!
-        </p>
-        <div className='flex flex-wrap items-center justify-center gap-4'>
+    <section className='px-6 py-20'>
+      <div className='mx-auto max-w-4xl'>
+        <h2 className='mb-3 text-2xl font-semibold text-white'>Contact</h2>
+        <p className='mb-8 text-sm text-zinc-500'>함께 일하고 싶으시다면 편하게 연락 주세요.</p>
+        <div className='flex flex-wrap gap-3'>
           <a
             href='https://github.com/eunwoo-levi'
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-4 font-semibold text-white transition-all hover:scale-105 hover:shadow-lg hover:shadow-purple-500/50'
+            className='inline-flex items-center gap-2 rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700 hover:text-white'
           >
-            <Github className='h-5 w-5' />
+            <Github className='h-4 w-4' />
             GitHub
           </a>
           <a
-            href='mailto:your-email@example.com'
-            className='inline-flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-8 py-4 font-semibold text-white transition-all hover:border-blue-500 hover:bg-gray-800'
+            href='mailto:eunwoo-levi@gmail.com'
+            className='inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-5 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200'
           >
-            <Mail className='h-5 w-5' />
+            <Mail className='h-4 w-4' />
             Email
           </a>
         </div>

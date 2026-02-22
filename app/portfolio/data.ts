@@ -37,16 +37,24 @@ export const contributions = [
     url: 'https://github.com/reactjs/ko.react.dev/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
   },
   {
-    name: 'toss/frontend-fundamentals',
-    url: 'https://github.com/toss/frontend-fundamentals/pulls?q=author%3Aeunwoo-levi+is%3Aclosed',
-  },
-  {
     name: 'toss/es-toolkit',
     url: 'https://github.com/toss/es-toolkit/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
   },
   {
-    name: 'ts-pattern',
-    url: 'https://github.com/gvergnaud/ts-pattern/pulls/eunwoo-levi',
+    name: 'toss/overlay-kit',
+    url: 'https://github.com/toss/overlay-kit/pulls?q=is%3Apr+is%3Aclosed+author%3Aeunwoo-levi',
+  },
+  {
+    name: 'toss/frontend-fundamentals',
+    url: 'https://github.com/toss/frontend-fundamentals/pulls?q=author%3Aeunwoo-levi+is%3Aclosed',
+  },
+  {
+    name: 'gvergnaud/ts-pattern',
+    url: 'https://github.com/gvergnaud/ts-pattern/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
+  },
+  {
+    name: 'TanStack/query',
+    url: 'https://github.com/TanStack/query/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
   },
 ];
 

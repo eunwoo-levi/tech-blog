@@ -1,30 +1,25 @@
-import { Code2, Github } from 'lucide-react';
+import { Github, ArrowUpRight } from 'lucide-react';
 import { contributions } from '../data';
 
 export default function ContributionsSection() {
   return (
-    <section className='border-b border-gray-800 px-6 py-20'>
-      <div className='mx-auto max-w-7xl'>
-        <div className='mb-12 flex items-center gap-3'>
-          <Code2 className='h-8 w-8 text-purple-400' />
-          <h2 className='text-4xl font-bold text-white'>Open Source Contributions</h2>
-        </div>
-        <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+    <section className='border-b border-zinc-800 px-6 py-20'>
+      <div className='mx-auto max-w-4xl'>
+        <h2 className='mb-10 text-2xl font-semibold text-white'>Contributions</h2>
+        <div className='grid gap-3 sm:grid-cols-2'>
           {contributions.map((contribution, index) => (
             <a
               key={index}
               href={contribution.url}
               target='_blank'
               rel='noopener noreferrer'
-              className='group rounded-2xl border border-gray-800 bg-gradient-to-br from-gray-900 to-gray-950 p-6 transition-all duration-300 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10'
+              className='group flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 transition-colors hover:border-zinc-600'
             >
-              <div className='mb-3 flex items-center gap-2'>
-                <Github className='h-5 w-5 text-purple-400' />
-                <span className='text-sm font-semibold text-purple-400'>Pull Requests</span>
-              </div>
-              <h3 className='text-lg font-bold text-white transition-colors group-hover:text-purple-400'>
+              <Github className='h-4 w-4 flex-shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300' />
+              <span className='flex-1 font-mono text-sm text-zinc-300 transition-colors group-hover:text-white'>
                 {contribution.name}
-              </h3>
+              </span>
+              <ArrowUpRight className='h-3.5 w-3.5 flex-shrink-0 text-zinc-700 transition-colors group-hover:text-sky-400' />
             </a>
           ))}
         </div>
