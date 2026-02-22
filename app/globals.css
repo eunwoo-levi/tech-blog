@@ -244,6 +244,15 @@
     overflow-wrap: break-word;
   }
 
+  /* 라이트 모드: inline code (code block 제외) */
+  :root .prose code:not(pre code) {
+    background-color: #d7e1f7 !important;
+    color: #1e2030 !important;
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.875em;
+  }
+
   /* 모바일 특별 처리 */
   @media (max-width: 640px) {
     .prose {
