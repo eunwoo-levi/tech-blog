@@ -1,0 +1,218 @@
+---
+title: '[React] Webpack 설정 최적화로 빌드 속도 개선하기'
+author: 'Eunwoo'
+thumbnail: '/thumbnail/etc/webpack.webp'
+publishDate: '2026-02-26'
+categoryId: 6
+keywords: ['Webpack']
+description: ''
+---
+
+프로젝트가 어느 정도 안정화된 시점에서 번들을 한 번 들여다봤다.
+성능에 큰 이슈는 없었다. 실제 체감도 나쁘지 않았다.
+
+그런데 문득 이런 생각이 들었다.
+
+> 지금은 괜찮은데, 기능이 계속 추가되면 이 구조도 괜찮을까?
+
+그래서 네트워크와 함께 production 모드에서 `webpack-bundle-analyzer`를 실행해봤다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/24377bfd-4157-497e-80ed-8fb1437720de/image.png)
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/0af53c46-3536-44f1-a185-0155e3b65519/image.png)
+
+결과는 단순했다.
+
+- 단일 bundle.js
+- 초기 main에 419개의 모듈 포함
+- 모든 페이지 코드가 초기 번들에 포함된 상태
+- 초기 JS 다운로드 크기 약 199kB
+
+지금은 빠르다.
+하지만 이 구조는 계속 빠를 수 있는 구조는 아니라고 판단했다.
+
+성능을 “현재 수치”가 아니라 “확장 시의 구조” 관점에서 보기 시작했다.
+
+# 문제를 어떻게 정의했는가
+
+문제는 단순히 “번들이 크다”가 아니었다.
+
+문제는 다음이었다.
+
+- 초기 로딩에 반드시 필요한 코드와
+- 특정 페이지에서만 필요한 코드가
+
+구분되지 않고 모두 한 번에 내려오고 있었다는 점이다.
+
+이 상태에서 페이지를 하나 추가하면 어떻게 될까?
+
+초기 번들은 또 커진다.
+그리고 그 증가분은 누적된다.
+
+나는 질문을 이렇게 바꿨다.
+
+> 지금 빠른가?
+> ❌
+> 확장해도 계속 빠를 수 있는 구조인가?
+> ✅
+
+이 시점에서 성능은 “최적화” 문제가 아니라
+책임 분리의 문제라고 생각하게 됐다.
+
+## 해결 전략: 초기 로딩의 책임을 분리하자
+
+해결 방향은 명확했다.
+
+- 1. 초기 로딩에 반드시 필요한 코드만 main에 남긴다.
+- 2. 나머지는 사용 시점에 불러온다.
+- 3. 자주 바뀌는 코드와 거의 안 바뀌는 코드를 분리한다.
+
+이를 위해 세 가지를 적용했다.
+
+# 1. Route 기반 Code Splitting
+
+가장 먼저 한 것은 페이지 단위 분리다.
+
+```ts
+const SignupPage = lazy(() => import('@/pages/signup'));
+```
+
+위 코드와 같이, 비핵심 페이지들을 lazy chunk로 분리했다.
+
+## 왜 이게 중요한가?
+
+초기 로딩에서:
+
+- 모든 페이지 코드가 한 번에 내려오는 구조 → ❌
+- 현재 라우트에 필요한 코드만 내려오는 구조 → ✅
+
+Code Splitting은 단순히 번들을 나누는 것이 아니다.
+초기 실행 비용을 통제하는 설계다.
+
+## 2. 번들 구조 재설계 (splitChunks + runtime 분리)
+
+다음은 번들 레벨 구조를 재설계했다.
+
+```ts
+splitChunks: {
+  chunks: 'all',
+  cacheGroups: {
+    vendor: {
+      test: /[\\/]node_modules[\\/]/,
+      name: 'vendors',
+      chunks: 'all',
+    },
+    common: {
+      name: 'common',
+      minChunks: 2,
+      chunks: 'all',
+      reuseExistingChunk: true,
+    },
+  },
+},
+runtimeChunk: 'single',
+```
+
+설계 의도는 이렇다
+
+- vendors: 외부 라이브러리 분리 (캐싱 안정성 확보)
+- runtime: 번들 로더 코드 분리 (변경 최소화)
+- main: 실제 앱 실행 코드만 포함
+
+이 구조는 단순 분리가 아니다.
+캐싱 전략을 고려한 분리다.
+
+예를 들어, 내가 UI 코드만 수정해도 vendors는 다시 다운로드될 필요가 없다.
+변경 범위를 줄이는 설계다.
+
+# 3. 트리셰이킹 활성화
+
+```ts
+optimization: {
+  usedExports: true,
+  sideEffects: true,
+}
+```
+
+트리셰이킹은 “사용하지 않는 코드를 번들에 포함시키지 않는 것”이다.
+
+예를 들어 어떤 라이브러리에서 10개의 함수가 export 되어 있어도,
+내가 2개만 사용한다면 나머지 8개는 번들에서 제거된다.
+
+이 과정은 production 모드 + minify 단계에서 확정된다.
+
+트리셰이킹은 눈에 보이는 기능이 아니다.
+하지만 번들이 커지는 것을 사전에 막는 장치다.
+
+# 4. Minify + Gzip 적용
+
+```ts
+new TerserPlugin({ ... })
+new CssMinimizerPlugin()
+new CompressionPlugin({ algorithm: 'gzip' })
+```
+
+여기서 중요한 건 역할 구분이다.
+
+- Terser → dead code 제거 + 코드 축약
+- CSS Minifier → 스타일 압축
+- Gzip → 전송 크기 감소
+
+gzip은 실행 속도를 높이는 게 아니다.
+네트워크 다운로드 비용을 줄인다.
+
+JS는 반복 패턴이 많아 압축 효율이 좋다.
+특히 모바일 네트워크에서 효과가 크다.
+
+# 결과
+
+최종적으로 번들 구조는 이렇게 바뀌었다.
+
+## 모듈 수 변화
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/0f8e3509-b501-449c-a0e5-f9dae226e386/image.png)
+
+- main 모듈 수: 419 → 208개 (약 50% 감소)
+
+## 초기 다운로드 구조 변화
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/b2a160ff-9e82-4f67-a1cd-9bf23f5097ea/image.png)
+
+- 단일 199kB bundle 구조
+- → runtime / vendors / main 분리
+- → 초기 main 약 62.4kB 수준으로 축소
+
+중요한 건 단순히 숫자가 아니다.
+
+이제 페이지를 추가해도 초기 번들이 자동으로 커지지 않는다.
+성능이 “운 좋게 빠른 상태”가 아니라,
+구조적으로 통제 가능한 상태가 되었다.
+
+## 최적화 과정에서 깨달은 것
+
+처음에는 성능을 Lighthouse 수치로 봤다.
+하지만 이번 작업을 통해 생각이 바뀌었다.
+
+성능은 수치가 아니라 설계 문제다.
+
+- 무엇이 초기 로딩에 포함되어야 하는가?
+- 무엇은 나중에 받아도 되는가?
+- 무엇이 자주 변경되는가?
+
+이 질문에 답하지 않으면,
+성능은 결국 기능 추가와 함께 무너진다.
+
+# 마무리
+
+이번 작업은 번들 크기를 줄이는 작업이 아니었다.
+
+초기 로딩의 책임을 정의하고,
+확장 가능한 성능 구조를 만드는 작업이었다.
+
+그리고 이 경험을 통해,
+프론트엔드 성능은 단순 최적화가 아니라
+아키텍처 설계의 영역이라는 것을 배웠다.
+
+# 참고자료
+
+- [Toss - Javascript Bundle Diet](https://toss.im/slash-21/sessions/3-2?srsltid=AfmBOooeJxGPkT6Jo2AIyb5hOyZsOQNQTlcntYMUwkLcEadmFv77ThMY)
