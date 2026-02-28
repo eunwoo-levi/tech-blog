@@ -1,5 +1,5 @@
 ---
-title: '[React] 시맨틱 태그, Aria, 포커스 트래핑으로 접근성(VoiceOver)과 SEO까지 개선하기'
+title: '[React] 접근성(A11y) 개선 - 모두가 읽을 수 있는 서비스 만들기'
 author: 'Eunwoo'
 thumbnail: '/thumbnail/reactjs.webp'
 publishDate: '2026-01-07'
@@ -17,7 +17,7 @@ keywords:
     'Modal',
     'SEO',
   ]
-description: '시맨틱 태그와 ARIA로 UI 구조를 명확히 하고 VoiceOver로 검증해 스크린 리더 인식 품질을 개선했다. 또한 Tab 키 기반 키보드 네비게이션과 모달 포커스 트래핑(useModalFocus)을 구현해 포커스 이탈 문제를 해결하고 접근성과 크롤링 친화성을 함께 끌어올린 과정을 정리한다.'
+description: '시맨틱 태그와 ARIA로 UI 구조를 명확히 하고 VoiceOver로 검증해 접근성(a11y)를 개선했다. 또한 Tab 키 기반 키보드 네비게이션과 모달 포커스 트래핑(useModalFocus)을 구현해 포커스 이탈 문제를 해결하고 접근성과 크롤링 친화성을 함께 끌어올린 과정을 정리한다.'
 ---
 
 프론트엔드 개발을 하다 보면, 기능이 잘 동작하고 UI가 예쁘게 렌더링되면 끝이라고 느끼기 쉽다.
@@ -27,351 +27,336 @@ description: '시맨틱 태그와 ARIA로 UI 구조를 명확히 하고 VoiceOve
 - 키보드(Tab)만으로도 흐름이 끊기지 않을까?
 - 검색 엔진/크롤러가 이 페이지의 구조를 “문서”로 파악할 수 있을까?
 
-특히 로그인/모달/내비게이션처럼 “앱의 뼈대”가 되는 UI는 시각 사용자에게만 잘 동작하면 충분하지 않다.
 접근성은 옵션이 아니라 기본 품질이고, 시맨틱 태그와 ARIA는 그 품질을 문서 구조 수준에서 끌어올리는 도구다.
 
-이번 글에서는 내가 실제 프로젝트에서 적용한 내용을 다음 순서로 정리한다.
+이번 글에서는 내가 실제 프로젝트에서 적용한 내용 기반으로 접근성 개선 과정을 단계별로 정리해보려고 한다.
 
-1. 시맨틱 태그가 왜 중요한가 (스크린리더/키보드/크롤러/SEO)
-2. ARIA는 언제, 어떻게 써야 하는가 (과하게 쓰지 않기)
-3. 폼에서 “에러가 보인다”를 “에러가 읽힌다”로
-4. 카드/링크/아이콘 UI에 의미 부여하기
-5. 모달에서 Tab 키 기반 키보드 네비게이션 + 포커스 트래핑(useModalFocus) 구현
-6. VoiceOver로 검증하는 체크리스트
+# 접근성이란?
 
-# 1. 시맨틱 태그가 왜 중요한가?
+접근성의 정의에 대해서는 Toss의 [Frontend Fundamentals](https://frontend-fundamentals.com/a11y/overview.html)에서 다음과 같이 설명한다.
 
-### 1-1. div는 “박스”고, 시맨틱 태그는 “문장”이다
+접근성(Accessibility, 줄여서 A11y)은 모든 사용자가 더 쉽고 편리하게 웹을 사용할 수 있도록 돕는 기본 원칙이다.
+프론트엔드 개발자는 HTML 구조를 만들고 인터랙션을 정의한다. 사용자와 가장 가까이에서 웹 경험을 설계하는 만큼, 접근성의 출발점이자 핵심 역할을 맡고 있다. 그래서 프론트엔드 개발자가 접근성을 신경 쓰면 누구나 이용할 수 있는 웹을 만들 수 있다.
 
-`div`는 레이아웃에는 편하지만 의미가 없다. 반면 시맨틱 태그는 그 자체로 역할을 가진다.
+접근성을 지키면 장애인, 비장애인, 개발자 모두에게 효용이 있다.
+장애인 사용자는 스크린 리더 같은 보조기기를 통해 웹사이트를 원활하게 이용할 수 있고, 일반 사용자는 더 빠르고 편리한 웹 경험을 할 수 있다.
+또한 개발자는 더 견고하고 유지보수하기 쉬운 코드를 작성할 수 있다.
 
-- `<form>`: 입력을 제출하는 폼
-- `<label>`: 입력 필드의 이름
-- `<button>`: 클릭 가능한 인터랙션
-- `<nav>`: 내비게이션 영역
-- `<main>`: 페이지의 메인 콘텐츠
-- `<header>`, `<footer>`: 상단/하단 영역
-- `<h1>`~`<h6>`: 섹션의 계층 구조
+해당 글에서 접근성이 뭔지, 왜 중요한지, 어떻게 개선할 수 있는지에 대한 개념과 원칙을 자세히 설명하고 있다.
+추가적으로 실제로 스크린리더로 테스트를 직접 해볼 수 있으니 한번 쯤은 읽어보는 것을 추천한다.
 
-시맨틱 태그는 “이 요소가 무슨 역할을 하나요?”를 명확히 한다.
-같은 UI라도 시맨틱 태그를 쓰면 브라우저/스크린리더/크롤러가 이미 의미를 알고 있는 구조가 된다.
+# 시맨틱 태그가 왜 중요한가?
 
-### 1-2. 스크린 리더는 “스크롤”보다 “탐색”을 한다
+## 1. 시각 장애인(스크린 리더 사용자) 관점
 
-시각 사용자는 스크롤로 훑는다.
-하지만 스크린 리더 사용자는 이런 방식으로 빠르게 이동한다.
+스크린 리더는 화면을 “보지” 않는다.
+대신 HTML 구조를 읽는다.
 
-- 랜드마크(메인/내비/헤더 등) 점프
-- 헤딩 목록으로 섹션 이동
-- 링크/버튼 목록으로 탐색
+- `<button>` → “버튼”
+- `<a>` → “링크”
+- `<nav>` → “내비게이션 영역”
+- `<main>` → “메인 콘텐츠”
 
-이때 시맨틱 구조가 없으면 페이지는 “의미 없는 박스들의 나열”이 되고, 사용자는 맥락을 잃는다.
-반대로 구조가 명확하면 **페이지가 “탐색 가능한 문서”**가 된다.
+반대로 `<div>`는 아무 의미도 없다.
 
-### 1-3. SEO/크롤링 관점에서도 “해석 비용”이 줄어든다
+예를 들어,
 
-시맨틱 태그 하나로 검색 순위가 갑자기 오르진 않는다.
-하지만 다음 효과는 확실히 체감된다.
+```tsx
+<div onClick={openModal}>열기</div>
+```
 
-- 내비게이션/본문/제목/섹션이 분리되면서 콘텐츠 중심이 명확해짐
-- 중복 텍스트(장식 요소/아이콘)가 정리되면서 본문 신호가 선명해짐
-- 구조가 안정되면서 페이지 템플릿 품질이 일정해짐(크롤러 입장에서도 예측 가능)
+이 코드는 스크린 리더에서 "클릭 가능한 요소"로 인식되지 않는다.
+결과적으로 사용자는 해당 기능을 탐색할 수 없다.
 
-즉, 시맨틱 태그는 “SEO 트릭”이 아니라 문서를 문서답게 만드는 기본기다.
+시맨틱 태그를 사용하면:
+
+- 버튼 목록 탐색 가능
+- 헤딩(h1~h6) 점프 가능
+- 랜드마크(nav/main) 이동 가능
+
+페이지가 “박스들의 나열”이 아니라 탐색 가능한 문서가 된다.
+
+### 2. 일반 사용자 관점 (키보드·브라우저 기본 동작)
+
+시맨틱 태그는 접근성뿐 아니라 브라우저의 기본 동작을 복원한다.
+
+예를 들어,
+
+- `<button>` → Enter/Space 자동 지원
+- `<a>` → 새 창 열기, 링크 복사 가능
+- `<form>` + `<button type="submit">` → Enter 제출 가능
+
+하지만, 반대로 div에 onClick만 달면
+
+반대로 div에 onClick만 달면:
+
+- Enter 동작 없음
+- 키보드 접근 불가
+- 브라우저 기본 UX 상실
+
+즉, 시맨틱 태그는 "장애인 전용 기능"이 아니라 **모든 사용자의 기본 UX를 보장하는 장치**다.
+
+## 3. 개발자 관점 (테스트 코드·유지보수)
+
+시맨틱 태그는 테스트 안정성을 높인다.
+예를 들어,
+
+```tsx
+screen.getByRole('button', { name: '로그인' });
+```
+
+이 코드는 다음이 충족될 때만 가능하다.
+
+- 실제 `<button>`
+- 또는 올바른 role
+- 적절한 label 연결
+
+div 기반 구조에서는,
+
+- class 선택
+- data-testid 의존
+- 구조 변경 시 테스트 깨짐
+
+그리고 시맨틱 기반 구조에서는,
+
+- 역할 기반 선택 가능
+- 리팩토링에 강함
+- 테스트가 사용자 관점과 일치
+
+즉, 시맨틱 태그는 접근성 개선이 아니라, 구조 품질과 테스트 품질을 동시에 올리는 설계 기준이다.
+
+## 4. 크롤러/SEO 관점 — “해석 가능한 문서”인가?
+
+검색 엔진도 결국 HTML을 읽는다.
+스크린 리더와 마찬가지로, 구조를 기반으로 의미를 해석한다.
+
+시맨틱 구조가 없는 경우에는,
+
+- `<div>`가 반복되어 콘텐츠 경계가 불명확함
+- 제목 계층이 깨져 페이지 주제가 흐려짐
+- 내비게이션/본문 구분이 명확하지 않음
+- 장식 요소와 실제 콘텐츠가 혼재됨
+  이 상태에서는 크롤러가 페이지의 중심 콘텐츠를 파악하는 데 추가 비용이 든다.
+
+반대로 시맨틱 태그를 적용하면,
+
+- `<main>`으로 핵심 콘텐츠가 명확해지고
+- `<nav>`로 탐색 영역이 분리되며
+- `<h1>~<h6>` 계층으로 문서 구조가 정리된다
 
 ![](https://velog.velcdn.com/images/eunwoo1341/post/6ae24341-e4a1-4d63-a277-c5658ffda924/image.png)
 
-# 2. ARIA는 “보완재”다: Semantic First, ARIA Last
+이는 검색 순위를 “트릭”으로 올리는 방법이 아니라,
+문서를 기계가 안정적으로 해석할 수 있는 구조로 만드는 작업이다.
 
-ARIA는 강력하지만, 잘못 쓰면 오히려 접근성을 망친다.
-내가 지킨 원칙은 단순했다.
+결과적으로, 콘텐츠 중심 신호가 명확해지고 템플릿 구조가 일관되며 Lighthouse SEO 점수도 함께 개선된다
 
-1. 먼저 네이티브 요소로 해결하기 (`button`, `a`, `input`, `label`…)
-2. 네이티브로 의미 전달이 부족할 때만 ARIA로 보완하기
-3. ARIA로 “역할”을 흉내내기보다 진짜 역할을 가진 태그로 바꾸기
+# 스크린 리더 이해하기
 
-예를 들어 `div + role="button"`은 가능하지만,
-가능하면 애초에 `<button>`을 쓰는 것이 더 안전하고 유지보수도 쉽다.
+먼저 스크린 리더의 기본적인 역할과 구성을 이해해 볼게요. 스크린 리더의 3요소는 `역할`, `레이블`, `상태값`이다.
 
-## 2-1. form: “에러가 보인다”를 “에러가 읽힌다”로
+스크린 리더는 화면에 있는 요소를 다음 순서로 읽는다.
 
-form은 접근성의 기본이 드러나는 UI다.
+- `역할(Role)`: 요소가 어떤 종류인지 나타낸다. (예: 버튼, 입력창, 스위치 등)
+- `레이블(Label)`: 컴포넌트의 이름이다. 어떤 기능인지 설명해요.
+- `상태(State)`: 현재 상태를 알려준다. (예: 활성화됨, 꺼짐, 선택됨 등)
 
-- 라벨이 연결되어야 한다
-- 에러가 발생하면 사용자가 즉시 인지해야 한다
-- 스크린 리더가 에러 메시지와 입력 필드를 관계로 이해해야 한다
+예시를 들어보면,
 
-form으로 자주 쓰이는 로그인 폼으로 어떻게 개선했는지 보자. (style은 생략)
-
-내 코드의 핵심은 `aria-describedby` + `aria-invalid` + 라이브 영역(`aria-live`)이다.
+<img
+  src='https://frontend-fundamentals.com/a11y/assets/marketing-noti-description.n7p4X6Oa.png'
+  style={{ width: '100%', margin: '1rem 0' }}
+/>
 
 ```tsx
-<fieldset>
-  <legend className='sr-only'>로그인 정보 입력</legend>
-  <div>
-    <label htmlFor='email'>이메일</label>
-    <input
-      id='email'
-      type='email'
-      placeholder='이메일을 입력해주세요'
-      value={formData.email}
-      onChange={handleChange('email')}
-      aria-describedby={errors.email ? 'email-error' : undefined}
-      aria-invalid={!!errors.email}
-    />
-    <span id='email-error' role={errors.email ? 'alert' : undefined} aria-live='polite'>
-      {errors.email || ' '}
-    </span>
-  </div>
-  <div>
-    <label htmlFor='password'>비밀번호</label>
-    <input
-      id='password'
-      type='password'
-      placeholder='비밀번호를 입력해주세요'
-      value={formData.password}
-      onChange={handleChange('password')}
-      aria-describedby={errors.password ? 'password-error' : undefined}
-      aria-invalid={!!errors.password}
-    />
-    <span
-      id='password-error'
-      role={errors.password ? 'alert' : undefined}
-      aria-live='polite'
-    >
-      {errors.password || ' '}
-    </span>
-  </div>
-</fieldSet>
+<div role='radio' tabindex='0' aria-checked='true' aria-label='마케팅 알림'></div>
 ```
 
-- `aria-describedby`: 에러 메시지와 입력 필드를 연결해 스크린 리더가 “이 필드에 이런 에러가 있어요”라고 읽게 한다.
-- `aria-invalid`: 입력 필드가 에러 상태임을 명시해 스크린 리더가 “이 필드는 잘못된 값이에요”라고 알린다.
-- `role="alert"` + `aria-live="polite"`: 에러 메시지에 라이브 영역을 지정해 에러가 생기면 스크린 리더가 즉시 읽도록 한다.
+스크린 리더는 순서대로 이렇게 읽는다.
 
-즉, 화면에서 빨간 글씨가 보이는 것에 그치지 않고
-“스크린 리더가 에러를 인지하고 안내하는 흐름”을 만들 수 있다.
+- 1. 마케팅 알림 (레이블)
+- 2. 체크상자 (역할)
+- 3. 선택됨 (상태)
+- 4. 설정을 끄거나 켜려면 이중탭 하십시오. (스크린 리더에서 자동 설명해주는 부분)
 
-## 2-2. 카드/내비게이션/아이콘: “의미”를 채우는 디테일
+# Semantic First — 태그로 역할을 복원하다
 
-시맨틱 태그를 잘 써도, 실제 제품 UI는 Card, Chip, IconButton, Tabs 같은 디자인 시스템 컴포넌트로 쌓이면서 의미가 흐려지기 쉽다.
-특히 접근성에서 자주 터지는 지점은 “겉으로는 클릭 가능해 보이지만, 기계(스크린리더/키보드)는 그걸 모른다”는 문제다.
-
-### “클릭 가능한 영역”은 가능한 한 네이티브 요소로 만든다
-
-클릭하면 동작하는 UI는 div가 아니라 `<button>` 또는 `<a>`가 1순위다.
-
-“버튼처럼 보이는 div”는 만들 수 있지만, 그 순간부터 키보드/스크린리더 동작을 전부 수동으로 재구현하게 된다.
-
-그럼 언제 `button`와 `<a>`를 써야 할까?
-버튼 같은 경우는 같은 페이지에서 상태를 바꾸거나 모달을 여는 등 “행동(action)”이면 `<button type="button">` 을 쓴다.
-링크 같은 경우는 다른 페이지로 이동하거나 외부 URL을 여는 등 “이동(navigation)”이면 `<a href="...">`를 쓴다.
-
-불가피하게 div를 써야 한다면(최후의 수단)
-
-`role="button"`, `tabIndex={0}`를 추가하고,
-`Enter/Space` 키 이벤트 처리까지 구현해 키보드 접근성을 제공해야 한다.
-
-> 결론: 의미를 ARIA로 “붙이는 것”보다, 태그 자체로 “가지게 하는 것”이 더 안전하다.
-
-### 현재 위치/선택 상태는 시각적 표시만으로 끝내지 않는다
-
-탭/사이드바/헤더 링크처럼 “현재 위치”가 중요한 UI는, 색상/밑줄만으로 표시하면 스크린리더·키보드 사용자는 맥락을 잃는다.
-
-- 현재 페이지 링크: `aria-current="page"`
-
-- 탭 UI
-  - 탭 버튼: `role="tab"`
-  - 탭 리스트: `role="tablist"`
-  - 선택 상태: `aria-selected`
-  - 연결: `aria-controls` / `id`
-
-이렇게 하면 “선택됨/현재” 같은 상태 정보가 음성으로도 전달된다.
-
-### 아이콘은 ‘정보’인지 ‘장식’인지 먼저 결정한다
-
-아이콘은 접근성에서 흔한 함정이다.
-화면에는 예쁘지만, 스크린리더 입장에서는 의미 없는 요소가 반복해서 읽히는 노이즈가 되기 쉽다.
-
-- 장식 아이콘(대부분의 경우)
-- 정보 전달이 목적이 아니라면: aria-hidden="true"
-- 예: 단순한 꾸밈, 레이아웃 분리, “분위기용” 아이콘
-
-- 정보 아이콘(아이콘이 의미가 있는 경우)
-  - 버튼이면 aria-label="..."로 의도를 설명
-  - 상태 아이콘이면 주변 텍스트로 의미를 제공하거나 aria-label로 보완
-
-여기서 자주 하는 실수는 아이콘과 텍스트가 함께 있는데 둘 다 읽혀서 중복 낭독 발생할 수 있다.
-그래서 아이콘을 `aria-hidden="true"` 처리하고, 텍스트만 읽히게 정리하는 게 깔끔하다.
-
-## 2-3. 동적 텍스트(알림, 에러, 배지)는 “변화”를 읽히게 만든다
-
-UI에서 숫자 배지(알림 수), 폼 에러, 토스트처럼 텍스트가 실시간으로 바뀌는 요소는 시각 사용자에게는 즉시 보이지만, 스크린리더에게는 “변화가 있었는지”가 전달되지 않을 수 있다.
-
-### 에러/중요 알림: role="alert" , aria-live="assertive"
-
-`role="alert"`를 사용하면 자동으로 `aria-live="assertive"`가 적용되어 즉시 낭독된다.
+기존에는 `div` 태그로 무의미한 코드가 몇개 보였다.
 
 ```tsx
-<div id="alert-box" role="alert">
-  <!-- 중요한 알림이 여기에 표시됨 -->
-</div>
-
-<button onclick="showAlert()">알림</button>
-
-<script>
-function showAlert() {
-    document.getElementById("alert-box").innerText = "긴급 공지: 서비스 점검이 예정되었습니다.";
-}
-</script>
+<div onClick={openModal}>열기</div>
 ```
 
-### 덜 긴급한 변화: aria-live="polite"
+시각적으로는 버튼이었지만, 키보드로 접근이 불가능했고, Space/Enter 동작도 없었다. 그리고 가장 중요한 스크린리더에서 버튼으로 인식되지 않는다는 문제점이 있었다.
 
-사용자의 현재 작업을 방해하지 않고, 콘텐츠가 변경되었을 때만 읽어준다.
-주로 알림 메시지, 검색 결과 갱신 등에 사용된다
+이를 다음 기준으로 교체했다.
+
+- 상태 변경 → `<button type="button">`
+- 페이지 이동 → `<a href="...">`
+- 입력 제출 → `<form>` + `<button type="submit">`
+
+이를 코드로 적용하면 아래와 같다.
 
 ```tsx
-<div id="search-result" aria-live="polite">
-  검색 결과가 여기에 표시됩니다.
-</div>
-
-<button onclick="updateSearchResults()">검색</button>
-
-<script>
-function updateSearchResults() {
-    document.getElementById("search-result").innerText = "총 10개의 검색 결과가 있습니다.";
-}
-</script>
+<button type='button' onClick={openModal}>
+  열기
+</button>
 ```
 
-위 코드를 예시로 보면, 검색 버튼을 누르면 결과가 업데이트되며, 스크린 리더가 새로운 내용만 읽어준다.
-하지만 사용자의 현재 작업을 방해하지 않는다.
+이 변경만으로, 아래와 같은 효과가 있었다.
 
-### 입력과 에러 연결: aria-describedby + aria-invalid
+- 기본 키보드 동작 자동 지원
+- role="button" 불필요
+- 테스트에서 getByRole('button') 사용 가능
+
+ARIA를 붙이기 전에, 기본 시맨틱 태그 자체로 의미를 전달하는 것이 가장 중요하다.
+
+# ARIA는 “의미를 보완하는 장치”다
+
+Semantic만으로 해결되지 않는 영역이 있다.
+특히 “이름”과 “상태”는 명시적으로 연결해줘야 한다.
+
+컴포넌트가 꺼졌는지 켜졌는지, 펼쳐졌는지 접혔는지 같은 동작 변화를 스크린 리더에 알려주려면 상태 속성을 설정해야 한다.
+HTML 기본 요소(`<button>`, `<input>` 등)는 일부 상태(checked, disabled)를 내장하고 있지만,
+`<div>`처럼 커스텀 요소를 쓸 때는 `aria-` 속성으로 상태를 명시적으로 알려야 한다.
+
+`aria-` 상태 속성은 여러 가지가 있지만, 가장 자주 쓰이는 것은 다음과 같다.
+
+## 1. aria-label — “이름 없는 버튼”을 구체화
+
+아이콘 버튼은 시각적으로는 명확하지만,
+스크린리더에게는 아무 의미도 없을 수 있다.
+
+예를 들어, 아래와 같은 코드가 있다.
 
 ```tsx
-<form>
-  <label for='username'>사용자 이름:</label>
-  <input id='username' type='text' aria-describedby='username-error' aria-invalid='true' />
-  <span id='username-error' role='alert' aria-live='assertive'>
-    사용자 이름은 필수 입력 항목입니다.
-  </span>
-</form>
+<button onClick={deleteItem}>
+  <TrashIcon />
+</button>
 ```
 
-`aria-describedby`는 입력 필드와 에러 메시지를 연결해 스크린 리더가 “이 필드에 이런 에러가 있어요”라고 읽게 한다.
-`aria-invalid`는 입력 필드가 에러 상태임을 명시해 스크린 리더가 “이 필드는 잘못된 값이에요”라고 알린다.
+VoiceOver에서는
 
-# 3. 모달 접근성의 진짜 핵심: Tab 네비게이션 + 포커스 트래핑
+> 버튼
 
-시맨틱/ARIA를 잘 적용해도, 모달에서 이 문제가 남으면 접근성은 깨진다.
+라고만 읽히기 때문에, 사용자는 이 버튼이 어떤 역할을 하는지 알 수 없다.
 
-> 모달이 열렸는데 Tab을 누르면 배경으로 포커스가 빠져나간다.
-
-키보드 사용자에게 이건 “길을 잃는 경험”이다.
-
-- 모달을 조작 중인데 포커스가 배경 버튼으로 이동
-- 현재 위치를 잃고 다시 모달로 돌아오기 어렵다
-- 스크린 리더는 배경을 계속 읽어버려 “모달 맥락”이 무너진다
-
-그래서 나는 useModalFocus 훅으로 **포커스 트래핑(Focus Trap)**을 구현했다.
-
-### useModalFocus 코드
+따라서, `aria-label`을 사용하여 다음과 같이 개선할 수 있다.
 
 ```tsx
-import { useEffect, useRef } from 'react';
+<button onClick={deleteItem} aria-label='게시글 삭제'>
+  <TrashIcon aria-hidden='true' />
+</button>
+```
 
+이제 VoiceOver는
+
+> 게시글 삭제, 버튼
+
+라고 읽어서, 사용자가 버튼의 역할을 명확히 이해할 수 있다.
+
+인터랙션 요소에 텍스트가 없으면 `aria-label`를 사용하여 이름을 명시적으로 연결해주는 것이 중요하다.
+추가적으로 장식 아이콘와 같이 의미없는 아이콘은 `aria-hidden="true"` 로 스크린리더에서 숨겨 사용자가 혼란스럽지 않도록 하는 것이 좋다.
+
+즉, `aria-label`은 단순 속성이 아니라 상호작용의 의미를 완성하는 이름 지정 장치다.
+
+## 2. aria-describedby + aria-invalid — 폼 상태 연결
+
+구현하고 있는 서비스의 폼에서 가장 중요했던 건 에러 전달이었다.
+
+```tsx
+<input
+  id="email"
+  aria-describedby={errors.email ? 'email-error' : undefined}
+  aria-invalid={!!errors.email}
+/>
+
+<span
+  id="email-error"
+  role={errors.email ? 'alert' : undefined}
+  aria-live="polite"
+>
+  {errors.email || ' '}
+</span>
+```
+
+위 코드에서 적용 포인트는 아래와 같다.
+
+- `aria-invalid` → 현재 입력 상태 명시
+- `aria-describedby` → 입력과 에러 연결
+- `aria-live` → 동적 변화 낭독
+
+결과적으로 에러는 더이상 “빨간 글씨”가 아니라 **상태 변화**로 인식되는 정보가 되었다.
+
+## 3. aria-live - 중요 정보 업데이트 알림
+
+`aria-live`는 현재 사용자에게 바로 전달해야하는 중요 정보가 포함된 컨텐츠 업데이트를 나타내는 상태 속성이다. 총 3가지 옵션이 있다.
+
+- `polite`: 현재 읽던 내용을 마친 후 업데이트된 내용을 읽는다. (기본값)
+- `assertive`: 즉시 읽기 중단 후 바로 새로운 내용을 읽는다. (긴급한 정보)
+- `off`: 컨텐츠 업데이트를 알리지 않는다.
+
+```tsx
+// 입력 중 에러 메세지를 알림
+<input type="email" value="1234" aria-describedby="error-message" />
+<p id="error-message" aria-live="polite">이메일 형식이 올바르지 않습니다.</p>
+
+// 오류 메세지를 알림
+<p aria-live="assertive">인터넷 연결이 끊어졌습니다.</p>
+```
+
+여기서 팁은
+
+`role="alert"`을 사용하면 aria-live="assertive"와 똑같이 동작한다.
+또한, `role="status"`를 사용하면 aria-live="polite"와 똑같이 동작한다.
+
+# 모달 — 포커스 트래핑으로 탐색 맥락 유지
+
+접근성에서 가장 크게 깨졌던 부분은 모달이었다.
+
+> 모달이 열렸는데 Tab을 누르면 배경으로 이동한다.
+
+이는 키보드 사용자에게 맥락 붕괴였다.
+
+그래서 `useModalFocus`를 구현하여 모달이 열린 동안 Tab/Shift+Tab이 모달 내부에서 순환하도록 만들었다.
+
+핵심 코드는 아래와 같다.
+
+```tsx
 const FOCUSABLE_ELEMENTS =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-export const useModalFocus = (isOpen: boolean) => {
-  const modalRef = useRef<HTMLDivElement>(null);
-  const focusableElementsRef = useRef<NodeListOf<Element> | null>(null);
-
-  useEffect(() => {
-    if (isOpen && modalRef.current) {
-      focusableElementsRef.current = modalRef.current.querySelectorAll(FOCUSABLE_ELEMENTS);
-      const focusableElements = focusableElementsRef.current;
-
-      if (focusableElements.length > 0) {
-        (focusableElements[0] as HTMLElement).focus();
-      } else {
-        modalRef.current.setAttribute('tabindex', '-1');
-        modalRef.current.focus();
-      }
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Tab') {
-          if (!focusableElementsRef.current || focusableElementsRef.current.length === 0) return;
-          const focusableElements = focusableElementsRef.current;
-
-          const firstElement = focusableElements[0] as HTMLElement;
-          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
-
-          if (event.shiftKey && document.activeElement === firstElement) {
-            lastElement.focus();
-            event.preventDefault();
-          } else if (!event.shiftKey && document.activeElement === lastElement) {
-            firstElement.focus();
-            event.preventDefault();
-          }
-        }
-      };
-
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen]);
-
-  return modalRef;
-};
 ```
 
-위 코드를 천천히 분석해보면,
+모달 내부에서 Tab으로 이동 가능한 요소(button, 링크, 입력창 등)를 한 번에 수집하기 위한 셀렉터다.
+포커스 트래핑의 기준이 되는 "순환 대상 목록"을 정의한다.
 
-`FOCUSABLE_ELEMENTS`의 경우 모달 내에서 포커스 가능한 모든 요소를 선택한다.
-
-이후에 아래 코드를 통하여 모달이 열릴 때 첫 번째 포커스 가능한 요소에 포커스를 맞추거나, 포커스 가능한 요소가 없을 경우 모달 컨테이너에 포커스를 맞춘다.
+### 1. 모달 오픈 시 첫 포커스 지정
 
 ```tsx
-if (focusableElements.length > 0) {
-  (focusableElements[0] as HTMLElement).focus();
-} else {
-  modalRef.current.setAttribute('tabindex', '-1');
-  modalRef.current.focus();
+(focusableElements[0] as HTMLElement).focus();
+```
+
+모달이 열리면 첫 번째 포커스 가능한 요소에 즉시 focus를 준다.
+사용자의 탐색 시작점을 모달 내부로 강제해 배경으로 포커스가 남지 않도록 한다.
+
+### 2. Tab / Shift+Tab 순환 제어
+
+```tsx
+if (event.shiftKey && document.activeElement === firstElement) {
+  lastElement.focus();
+  event.preventDefault();
 }
 ```
 
-그 다음 코드가 핵심인데, Tab/Shift+Tab 키 이벤트를 감지하여 포커스가 모달 내부에서 순환하도록 하는 역할을 하고 있다.
+현재 포커스가 첫 요소일 때 Shift+Tab을 누르면 마지막 요소로 이동시킨다.
+모달 밖으로 포커스가 빠져나가는 것을 막고 내부에서만 순환하도록 제어한다.
 
-```tsx
-if (event.key === 'Tab') {
-  ...
-  const firstElement = focusableElements[0] as HTMLElement;
-  const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+<br />
 
-  // Shift+Tab으로 첫 요소에서 "이전"으로 나가려는 순간 → 마지막으로 보내기
-  if (event.shiftKey && document.activeElement === firstElement) {
-    lastElement.focus();
-    event.preventDefault();
-  }
-  // Tab으로 마지막 요소에서 "다음"으로 나가려는 순간 → 첫 번째로 보내기
-  else if (!event.shiftKey && document.activeElement === lastElement) {
-    firstElement.focus();
-    event.preventDefault();
-  }
-}
-```
+결과적으로, 포커스 이탈 차단과 함께 모달 내부 탐색을 유지하고, 배경 낭독 방지하여 사용자 경험이 크게 개선되었다.
+모달은 이제 단순한 overlay가 아니라 독립된 탐색 컨텍스트가 될 수 있었다.
 
-정리하면, 브라우저에서 Tab 키를 누를 때 기본적으로 다음으로 넘어가는 기능을 제공해주지만, 자신이 구현한 모달(컴포넌트) 밖으로 포커스가 나가는 것을 방지하기 위해, `useModalFocus` 훅에서는 Tab 키 이벤트를 감지하여 포커스가 모달 내부에서 순환하도록 한다.
-
-![](https://velog.velcdn.com/images/eunwoo1341/post/1e425814-d79b-4ac5-897c-0a89ce6a26fa/image.png)
-
-결과적으로, Lighthouse 접근성 및 SEO 점수가 각각 100점으로 개선되었고, VoiceOver로 검증한 결과도 훨씬 자연스러운 흐름이 되었다.
-그 이유는, 시맨틱 태그와 ARIA로 UI 구조가 명확해지고, Tab 키 기반 키보드 네비게이션과 포커스 트래핑으로 모달에서 포커스 이탈 문제를 해결했기 때문이다.
-
-# VoiceOver으로 검증
+# 스크린린더 검증
 
 VoiceOver는 macOS/iOS에 내장된 스크린 리더다.
 해당 스크린리더를 통하여 시맨틱 태그와 ARIA가 제대로 동작하는지 검증할 수 있다.
@@ -393,6 +378,8 @@ VoiceOver는 macOS/iOS에 내장된 스크린 리더다.
 - 아이콘/장식 요소가 불필요하게 읽히지 않는가?
 - 모달이 “dialog”로 인지되고 제목이 함께 읽히는가?
 - 모달이 열린 동안 배경을 읽으려 하지 않는가?
+
+아래 영상들을 보면서 실제로 VoiceOver로 검증한 결과를 확인해 볼 수 있다.
 
 ## 로그인 페이지
 
@@ -431,3 +418,18 @@ VoiceOver는 macOS/iOS에 내장된 스크린 리더다.
     </video>
   </div>
 </div>
+
+# 마무리
+
+접근성 개선은 단순히 “장애인도 사용할 수 있게 하는” 작업이 아니다.
+모든 사용자가 더 편리하고 직관적인 웹 경험을 할 수 있도록 하는 기본 품질 향상 작업이다.
+
+시맨틱 태그와 ARIA는 그 품질을 문서 구조 수준에서 끌어올리는 도구다.
+그리고 VoiceOver와 같은 스크린 리더로 실제로 검증하는 과정이 필수적이다.
+
+이번 글에서는 내가 실제 프로젝트에서 적용한 내용 기반으로 접근성 개선 과정을 단계별로 정리해보았다.
+앞으로도 접근성을 지속적으로 개선하여 모두가 읽을 수 있는 서비스를 만들어 나가고자 한다.
+
+## 참고 자료
+
+- [Toss-frontend-fundamentals](https://frontend-fundamentals.com/a11y/overview.html)

@@ -449,11 +449,9 @@ Promise.race([getPopularMovies, timeoutPromise])
 ```
 
 - getPopularMovies:
-
   - Math.random()을 사용하여 1~5초 사이의 랜덤 지연 후 '외부 API 접근한 결괏값'을 resolve합니다.
 
 - timeoutPromise:
-
   - 3초 후에 reject되도록 설정되어 있습니다.
   - 3초 내에 getPopularMovies가 완료되지 않으면 이 Promise가 먼저 reject되어 "대기 시간이 오래 걸립니다" 오류 메시지가 출력됩니다.
 
