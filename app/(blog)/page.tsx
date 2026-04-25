@@ -10,9 +10,9 @@ export default async function HomePage() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Blog',
-    name: '리바이 기술블로그',
+    name: '리바이 개발블로그',
     description:
-      '리바이의 프론트엔드 기술블로그 - React, Next.js, TypeScript, JavaScript 학습 기록 및 개발 경험 공유',
+      '리바이의 프론트엔드 개발블로그 - React, Next.js, TypeScript, JavaScript 학습 기록 및 개발 경험 공유',
     url: 'https://www.eunwoo-levi.com',
     author: {
       '@type': 'Person',
@@ -21,7 +21,7 @@ export default async function HomePage() {
     },
     publisher: {
       '@type': 'Organization',
-      name: '리바이 기술블로그',
+      name: '리바이 개발블로그',
       logo: {
         '@type': 'ImageObject',
         url: 'https://www.eunwoo-levi.com/levi.webp',

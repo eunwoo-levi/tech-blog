@@ -27,15 +27,15 @@ export async function generateMetadata({ params }: ParamsProps): Promise<Metadat
   const categoryUrl = `https://www.eunwoo-levi.com/${category}`;
 
   return {
-    title: `${categoryData.name} - 리바이 기술블로그`,
-    description: `${categoryData.name} 카테고리의 기술블로그 포스트들을 확인해보세요.`,
-    keywords: [categoryData.name, '개발', '프론트엔드', '블로그'],
+    title: `${categoryData.name} - 리바이 개발블로그`,
+    description: `${categoryData.name} 카테고리의 개발블로그 포스트들을 확인해보세요.`,
+    keywords: [categoryData.name, '개발', '프론트엔드', '블로그', '개발블로그', '리바이'],
     openGraph: {
       type: 'website',
-      title: `${categoryData.name} - 리바이 기술블로그`,
-      description: `${categoryData.name} 카테고리의 기술블로그 포스트들을 확인해보세요.`,
+      title: `${categoryData.name} - 리바이 개발블로그`,
+      description: `${categoryData.name} 카테고리의 개발블로그 포스트들을 확인해보세요.`,
       url: categoryUrl,
-      siteName: '리바이 기술블로그',
+      siteName: '리바이 개발블로그',
       images: [
         {
           url: 'https://www.eunwoo-levi.com/levi.webp',
@@ -47,8 +47,8 @@ export async function generateMetadata({ params }: ParamsProps): Promise<Metadat
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${categoryData.name} - 리바이 기술블로그`,
-      description: `${categoryData.name} 카테고리의 기술블로그 포스트들을 확인해보세요.`,
+      title: `${categoryData.name} - 리바이 개발블로그`,
+      description: `${categoryData.name} 카테고리의 개발블로그 포스트들을 확인해보세요.`,
       images: ['https://www.eunwoo-levi.com/levi.webp'],
     },
     alternates: {
@@ -77,8 +77,8 @@ export default async function CategoryPage({ params }: ParamsProps) {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    name: `${categoryData.name} - 리바이 기술블로그`,
-    description: `${categoryData.name} 카테고리의 기술블로그 포스트들을 확인해보세요.`,
+    name: `${categoryData.name} - 리바이 개발블로그`,
+    description: `${categoryData.name} 카테고리의 개발블로그 포스트들을 확인해보세요.`,
     url: `https://www.eunwoo-levi.com/${category}`,
     breadcrumb: {
       '@type': 'BreadcrumbList',
