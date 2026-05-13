@@ -2,14 +2,19 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { navbarList } from '../model/data';
 import MobileNavbar from './MobileNavbar';
 import { FaGithub } from 'react-icons/fa';
 import DarkModeButton from './DarkModeButton';
 import Image from 'next/image';
+import { useLanguage } from '@/app/portfolio/LanguageContext';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const isPortfolio = pathname.startsWith('/portfolio');
+  const { lang, toggle } = useLanguage();
 
   return (
     <nav className='sticky left-0 top-0 z-50 flex h-[70px] w-full bg-white/90 shadow-md dark:bg-black/90'>
@@ -41,6 +46,15 @@ export default function Navbar() {
         </div>
 
         <div className='flex items-center justify-end gap-5'>
+          {isPortfolio && (
+            <button
+              onClick={toggle}
+              className='rounded-full border border-gray-300 px-3 py-1.5 text-xs font-bold tracking-wide transition-colors hover:border-gray-500 dark:border-gray-600 dark:hover:border-gray-400'
+              aria-label='Switch language'
+            >
+              {lang === 'ko' ? 'KO' : 'EN'}
+            </button>
+          )}
           <Link
             href='https://github.com/eunwoo-levi'
             className='rounded-lg p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:hover:bg-gray-700 hover:lg:bg-gray-200'

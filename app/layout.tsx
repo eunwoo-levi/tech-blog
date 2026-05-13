@@ -6,6 +6,7 @@ import { Footer } from '@/src/widgets/footer';
 import { SpaceBackground } from '@/src/shared/ui';
 import { GoogleAnalytics } from '@/src/app/provider/GoogleAnalytics';
 import localFont from 'next/font/local';
+import { LanguageProvider } from './portfolio/LanguageContext';
 
 const iansui = localFont({
   src: '../public/fonts/iansui.woff2',
@@ -105,11 +106,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar />
-          <SpaceBackground />
+          <LanguageProvider>
+            <Navbar />
+            <SpaceBackground />
 
-          <main className='min-h-[calc(100vh-190px)]'>{children}</main>
-          <Footer />
+            <main className='min-h-[calc(100vh-190px)]'>{children}</main>
+            <Footer />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>
