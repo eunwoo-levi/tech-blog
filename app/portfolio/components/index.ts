@@ -4,3 +4,6 @@ export { default as AwardsSection } from './AwardsSection';
 export { default as ProjectsSection } from './ProjectsSection';
 export { default as ContributionsSection } from './ContributionsSection';
 export { default as ContactSection } from './ContactSection';
+export { default as SkillsSection } from './SkillsSection';
+export { default as ScrollReveal } from './ScrollReveal';
+export { default as LanguageToggle } from './LanguageToggle';
