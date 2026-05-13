@@ -1,3 +1,18 @@
+export const skills = [
+  {
+    category: 'Language',
+    items: ['JavaScript', 'TypeScript', 'HTML', 'CSS', 'Python'],
+  },
+  {
+    category: 'Frameworks & Libraries',
+    items: ['React', 'Next.js', 'Nest.js', 'Tanstack Query', 'Zustand', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
+  },
+  {
+    category: 'Tools',
+    items: ['Figma', 'Google Analytics', 'Sentry'],
+  },
+];
+
 export const activities = [
   {
     title: 'Google Asia-Pacific Solution Challenge',
@@ -8,12 +23,12 @@ export const activities = [
   {
     title: 'WoowaCourse 7th FE',
     role: 'Woowa Bros.',
-    period: '2025.02 - ongoing',
+    period: '2025.02 - 2025.11',
     icon: '🚀',
   },
   {
     title: 'AI Melaka Co., Ltd.',
-    role: 'Frontend & PM Intern',
+    role: 'Frontend Intern',
     period: '2024.12 - 2025.02',
     icon: '💼',
   },
@@ -33,8 +48,8 @@ export const activities = [
 
 export const contributions = [
   {
-    name: 'reactjs/ko.react.dev',
-    url: 'https://github.com/reactjs/ko.react.dev/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
+    name: 'NaverPayDev/hidash',
+    url: 'https://github.com/NaverPayDev/hidash/pull/289',
   },
   {
     name: 'toss/es-toolkit',
@@ -49,6 +64,10 @@ export const contributions = [
     url: 'https://github.com/toss/frontend-fundamentals/pulls?q=author%3Aeunwoo-levi+is%3Aclosed',
   },
   {
+    name: 'reactjs/ko.react.dev',
+    url: 'https://github.com/reactjs/ko.react.dev/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
+  },
+  {
     name: 'gvergnaud/ts-pattern',
     url: 'https://github.com/gvergnaud/ts-pattern/pulls?q=is%3Apr+author%3Aeunwoo-levi+is%3Aclosed',
   },
@@ -59,6 +78,7 @@ export const contributions = [
 ];
 
 export const awards = [
+  { title: '2026 KIISE ASK Conference — LLM Research Division', prize: '🥉 Bronze' },
   { title: '2025 Google Asia-Pacific Solution Challenge', prize: '🏆 Top 10' },
   { title: '2025 Google New Year Hackathon', prize: '🥈 2nd Place' },
   { title: '2024 Daehyeong Region Collegiate SW Hackathon', prize: '🥉 3rd Place' },
@@ -66,80 +86,46 @@ export const awards = [
 
 export const projects = [
   {
-    title: 'Emotion-Centered Social Network',
+    title: 'Moment',
     description: 'WoowaCourse Team Project',
+    detail:
+      '익명 기반 소셜 네트워크 서비스입니다. 프론트엔드 개발을 담당하며 웹 서비스를 WebView 기반 앱으로 확장하고, 사용자 테스트 피드백을 반영해 웹·앱 전반의 UX와 운영 구조를 개선했습니다.',
+    detailEn:
+      'An anonymous-based social network service. Led frontend development, extended the web service into a WebView-based app, and improved UX and operational structure based on user test feedback.',
     period: '2025.07 - ongoing',
-    url: 'https://github.com/woowacourse-teams/2025-moment',
+    url: 'https://connectingmoment.com/',
     tags: ['Social', 'Network', 'Emotion'],
   },
   {
-    title: 'Mock Exam Registration Platform',
-    description: 'Nationwide Mock Exam Management System',
-    period: '2025.06 - 2025.08',
-    url: 'https://github.com/mosu-dev/mosu-client',
-    tags: ['Platform', 'Education', 'Management'],
-  },
-  {
-    title: 'VitalTrip - Emergency Response Service',
+    title: 'VitalTrip',
     description: '2025 Google Asia-Pacific Solution Challenge',
+    detail:
+      '해외 응급 상황에서 위치 기반 의료시설 탐색과 AI 응급 대응 정보를 제공하는 글로벌 의료 지원 서비스입니다. 풀스택 개발을 담당하며 기획부터 프론트엔드·백엔드·배포까지 구현했고, 2025 Google 글로벌 해커톤에서 전 세계 Top 10 Finalist에 선정되었습니다.',
+    detailEn:
+      'A global medical support service providing location-based medical facility search and AI emergency response in overseas emergencies. Led full-stack development from planning to deployment — selected as a Top 10 Global Finalist at the 2025 Google APAC Solution Challenge.',
     period: '2025.06 - ongoing',
-    url: 'https://github.com/GDG-on-Campus-KNU/4th-SC-Team-5-FE',
+    url: 'https://aivitaltrip.com/',
     tags: ['Google', 'AI', 'Healthcare'],
   },
   {
-    title: 'AI Real-time Patient Monitoring Service',
-    description: '2025 Google New Year Hackathon',
-    period: '2025.01',
-    url: 'https://drive.google.com/file/d/1lJTyVYMgg1W0HQbOAtVb8eMCiaIqxrwT/view',
-    tags: ['AI', 'Healthcare', 'Real-time'],
-  },
-  {
     title: 'Debate Timer Service',
-    description: 'Timer Service for Debate Timekeeping',
+    description: 'Nationwide debate timing platform used across South Korea.',
     period: '2024.12 - 2025.03',
-    url: 'https://github.com/debate-timer/debate-timer-fe',
+    url: 'https://www.debate-timer.com/en/home',
     tags: ['React', 'Timer', 'Service'],
   },
   {
-    title: 'AI Dietary Management System',
-    description: 'Google Vision ChallengeThon',
-    period: '2024.11',
-    url: 'https://github.com/AI-Food-Analysis-Google-Challengethon',
-    tags: ['AI', 'Health', 'Google'],
-  },
-  {
     title: 'Architect Web Application',
-    description: 'Commercial Project',
+    description: 'Freelance web service built for a professional architecture firm.',
     period: '2024.09 - 2024.11',
-    url: 'https://github.com/eunwoo-levi/architect-web',
+    url: 'https://www.daegu-jinsung.com/',
     tags: ['Commercial', 'Architecture', 'Web'],
-  },
-  {
-    title: 'Daegu Commercial District Blue Marble Game',
-    description: '2024 Daehyeong Region Collegiate SW Hackathon',
-    period: '2024.09',
-    url: 'https://github.com/commercial-game-service/Frontend',
-    tags: ['Game', 'Hackathon', 'Web'],
   },
   {
     title: 'Personal Portfolio & Tech Blog',
     description: 'Built with Next.js, TypeScript, and Tailwind CSS',
     period: '2024.08',
-    url: 'https://eunwoo-levi.com',
+    url: 'https://www.eunwoo-levi.com/',
     tags: ['Next.js', 'Blog', 'Portfolio'],
-  },
-  {
-    title: 'AI Recycling Web Application',
-    description: 'Daegu Environment Government Collaboration',
-    period: '2024.07 - 2024.11',
-    url: 'https://github.com/AI-Recycling-Service-Ecobuddy/FullStack',
-    tags: ['AI', 'Environment', 'Web App'],
-  },
-  {
-    title: 'AI Industrial Accident Chatbot',
-    description: '2024 Employment and Labor Public Data Utilization Competition',
-    period: '2024.07 - 2024.08',
-    url: 'https://github.com/Injury-law-assist',
-    tags: ['AI', 'Chatbot', 'Public Data'],
   },
 ];
