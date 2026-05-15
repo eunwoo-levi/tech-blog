@@ -7,5 +7,5 @@ export const CATEGORIES = [
   { id: 5, name: 'Next.js', path: 'nextjs' },
   { id: 6, name: 'React', path: 'react' },
   { id: 7, name: 'Woowacourse', path: 'woowacourse' },
-  { id: 8, name: 'Algorithm', path: 'algorithm' },
+  { id: 8, name: 'Backend', path: 'backend' },
 ] as const;
