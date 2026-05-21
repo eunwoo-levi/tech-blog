@@ -567,10 +567,10 @@ Chrome Devtools에서 React Profiler와 Performance에서도 개선이 확인되
 무한스크롤은 네트워크 비용을 줄이는 데는 효과적이지만, 렌더링 비용을 줄이지는 않습니다.
 사용자가 목록을 계속 탐색할수록 DOM에 카드가 누적되고, 브라우저는 보이지 않는 영역까지 관리해야 합니다.
 
-`useWindowVirtualizer`는 이 문제를 viewport 기준 렌더링으로 해결합니다.
-전체 데이터는 `useInfiniteQuery`의 pages 배열에 유지하되, 실제 DOM에는 현재 보이는 영역과 그 주변(overscan)만 렌더링합니다.
+useWindowVirtualizer는 이 문제를 viewport 기준 렌더링으로 해결합니다.
+전체 데이터는 useInfiniteQuery의 pages 배열에 유지하되, 실제 DOM에는 현재 보이는 영역과 그 주변(overscan)만 렌더링합니다.
 
-`useInfiniteQuery`와 `useWindowVirtualizer`의 역할은 명확하게 분리되어 있습니다.
+useInfiniteQuery와 useWindowVirtualizer의 역할은 명확하게 분리되어 있습니다.
 
 - `useInfiniteQuery`: 데이터를 언제, 어떻게 가져올지 (fetching, caching)
 - `useWindowVirtualizer`: 가져온 데이터를 어떻게 보여줄지 (rendering)
@@ -587,8 +587,8 @@ Chrome Devtools에서 React Profiler와 Performance에서도 개선이 확인되
 
 **주의할 점**
 
-- `scrollMargin`을 정확히 설정하지 않으면 아이템 위치가 어긋납니다. 리스트 상단에 헤더나 필터 영역이 있다면 반드시 `offsetTop`을 전달해야 합니다.
-- `estimateSize`는 초기 레이아웃에만 사용됩니다. 실제 높이는 `measureElement`가 렌더링 후 측정하므로, 카드마다 높이 차이가 크다면 초기 스크롤 위치 계산이 부정확할 수 있습니다.
-- `initialData`와 `staleTime`을 함께 설정하지 않으면 마운트 직후 불필요한 배경 재요청이 발생합니다.
+- scrollMargin을 정확히 설정하지 않으면 아이템 위치가 어긋납니다. 리스트 상단에 헤더나 필터 영역이 있다면 반드시 offsetTop을 전달해야 합니다.
+- estimateSize는 초기 레이아웃에만 사용됩니다. 실제 높이는 measureElement가 렌더링 후 측정하므로, 카드마다 높이 차이가 크다면 초기 스크롤 위치 계산이 부정확할 수 있습니다.
+- initialData와 staleTime을 함께 설정하지 않으면 마운트 직후 불필요한 배경 재요청이 발생합니다.
 
-대용량 리스트에서 무한스크롤만으로 성능이 충분하지 않다면, `useInfiniteQuery`로 데이터 흐름을 관리하면서 `useWindowVirtualizer`로 렌더링을 제한하는 조합이 실용적인 선택이 될 수 있습니다.
+대용량 리스트에서 무한스크롤만으로 성능이 충분하지 않다면, useInfiniteQuery로 데이터 흐름을 관리하면서 useWindowVirtualizer로 렌더링을 제한하는 조합이 실용적인 선택이 될 수 있습니다.
