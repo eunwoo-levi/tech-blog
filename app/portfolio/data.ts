@@ -138,7 +138,7 @@ export const projects = [
       'A global medical support service providing location-based medical facility search and AI emergency response in overseas emergencies. Led full-stack development from planning to deployment — selected as a Top 10 Global Finalist at the 2025 Google APAC Solution Challenge.',
     period: '2025.06 - ongoing',
     url: 'https://aivitaltrip.com/',
-    tags: ['Google', 'AI', 'Healthcare'],
+    tags: ['Next.js', 'React', 'TypeScript', 'NestJS', 'MySQL', 'Playwright', 'Zustand', 'Tailwind'],
     image: '/portfolio/vitaltrip.webp',
   },
   {
@@ -150,7 +150,7 @@ export const projects = [
       'An anonymous-based social network service. Led frontend development, extended the web service into a WebView-based app, and improved UX and operational structure based on user test feedback.',
     period: '2025.07 - 2026.05',
     url: 'https://connectingmoment.com/',
-    tags: ['Social', 'Network', 'Emotion'],
+    tags: ['React', 'TypeScript', 'TanStack Query', 'Webpack', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
     image: '/portfolio/moment.webp',
   },
   {
@@ -158,7 +158,7 @@ export const projects = [
     description: 'Nationwide debate timing platform used across South Korea.',
     period: '2024.12 - 2025.03',
     url: 'https://www.debate-timer.com/en/home',
-    tags: ['React', 'Timer', 'Service'],
+    tags: ['React', 'TypeScript', 'TanStack Query', 'Vitest', 'Storybook', 'Tailwind'],
     image: '/portfolio/timer.webp',
   },
   {
@@ -166,7 +166,7 @@ export const projects = [
     description: 'Freelance web service built for a professional architecture firm.',
     period: '2024.09 - 2024.11',
     url: 'https://www.daegu-jinsung.com/',
-    tags: ['Commercial', 'Architecture', 'Web'],
+    tags: ['Next.js', 'Tailwind'],
     image: '/portfolio/architect.webp',
   },
   {
@@ -174,7 +174,7 @@ export const projects = [
     description: 'Built with Next.js, TypeScript, and Tailwind CSS',
     period: '2024.08 - ongoing',
     url: 'https://www.eunwoo-levi.com/',
-    tags: ['Next.js', 'Blog', 'Portfolio'],
+    tags: ['Next.js', 'Tailwind'],
     image: '/portfolio/blog.webp',
   },
 ];
