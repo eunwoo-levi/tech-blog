@@ -1,11 +1,15 @@
 export const skills = [
   {
     category: 'Language',
-    items: ['JavaScript', 'TypeScript', 'HTML', 'CSS', 'Python'],
+    items: ['JavaScript', 'TypeScript', 'C++', 'HTML', 'CSS', 'Python'],
   },
   {
     category: 'Frameworks & Libraries',
-    items: ['React', 'Next.js', 'Nest.js', 'Tanstack Query', 'Zustand', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
+    items: ['React', 'Next.js', 'NestJS', 'TanStack Query', 'Zustand', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
+  },
+  {
+    category: 'Backend & Infra',
+    items: ['MySQL', 'Docker', 'AWS S3', 'CloudFront', 'EC2', 'Lambda', 'CodePipeline', 'GitHub Actions'],
   },
   {
     category: 'Tools',
@@ -16,9 +20,19 @@ export const skills = [
 export const activities = [
   {
     title: 'Google Asia-Pacific Solution Challenge',
-    role: 'Top 10',
+    role: 'Top 10 Global Finalist',
     period: '2025.05',
     icon: '🏆',
+    descriptionKo: '전 세계 3,370개 팀 중 글로벌 Top 10 Finalist 선정',
+    descriptionEn: 'Selected as a Global Top 10 Finalist out of 3,370 teams worldwide',
+  },
+  {
+    title: '2025 ADB APAC Digital Transformation Forum',
+    role: 'Presenter',
+    period: '2025',
+    icon: '🌏',
+    descriptionKo: '글로벌 CTO들을 대상으로 VitalTrip 프로젝트 발표',
+    descriptionEn: 'Presented the VitalTrip project to global CTOs at the 2025 ADB APAC Digital Transformation Forum',
   },
   {
     title: 'WoowaCourse 7th FE',
@@ -43,6 +57,8 @@ export const activities = [
     role: 'Sergeant, USAG Yongsan-Casey',
     period: '2021 - 2023',
     icon: '🎖️',
+    descriptionKo: '한국군-미군 간 공식 통역·번역 담당. 고위 지휘관 및 한국 정부 관계자 회의에서 영·한 동시통역 수행',
+    descriptionEn: 'Served as official interpreter and translator between Korean and U.S. forces. Performed English–Korean simultaneous interpretation at meetings with senior commanders and Korean government officials.',
   },
 ];
 
