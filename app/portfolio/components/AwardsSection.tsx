@@ -15,8 +15,8 @@ export default function AwardsSection() {
         <div className='divide-y divide-zinc-900'>
           {awards.map((award, index) => (
             <div key={index} className='flex items-center justify-between py-4'>
-              <p className='text-sm text-zinc-200'>{award.title}</p>
-              <span className='ml-6 flex-shrink-0 text-sm font-medium text-amber-400'>
+              <p className='text-base text-zinc-200'>{award.title}</p>
+              <span className='ml-6 flex-shrink-0 text-base font-medium text-amber-400'>
                 {award.prize}
               </span>
             </div>

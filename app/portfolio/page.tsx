@@ -26,10 +26,10 @@ export default function PortfolioPage() {
         <SkillsSection />
       </ScrollReveal>
       <ScrollReveal delay={50}>
-        <ExperienceSection />
+        <AwardsSection />
       </ScrollReveal>
       <ScrollReveal delay={50}>
-        <AwardsSection />
+        <ExperienceSection />
       </ScrollReveal>
       <ScrollReveal delay={50}>
         <ProjectsSection />

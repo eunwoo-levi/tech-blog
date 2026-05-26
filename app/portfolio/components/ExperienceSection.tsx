@@ -14,17 +14,26 @@ export default function ExperienceSection() {
         <h2 className='mb-10 text-2xl font-semibold text-white'>{tr.sections.experience}</h2>
         <div className='divide-y divide-zinc-900'>
           {activities.map((activity, index) => {
-            const description = lang === 'ko' ? activity.descriptionKo : activity.descriptionEn;
+            const raw = lang === 'ko' ? activity.descriptionKo : activity.descriptionEn;
+            const lines: string[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
+
             return (
-              <div key={index} className='flex items-start gap-8 py-5'>
-                <span className='w-44 flex-shrink-0 pt-0.5 text-xs text-zinc-600'>
+              <div key={index} className='flex items-start gap-8 py-6'>
+                <span className='w-44 flex-shrink-0 pt-0.5 text-sm text-zinc-600'>
                   {activity.period}
                 </span>
                 <div className='flex-1'>
-                  <h3 className='text-sm font-semibold text-zinc-100'>{activity.title}</h3>
+                  <h3 className='text-base font-semibold text-zinc-100'>{activity.title}</h3>
                   <p className='mt-0.5 text-sm text-zinc-500'>{activity.role}</p>
-                  {description && (
-                    <p className='mt-1.5 text-xs leading-relaxed text-zinc-600'>{description}</p>
+                  {lines.length > 0 && (
+                    <ul className='mt-2.5 space-y-1.5'>
+                      {lines.map((line, i) => (
+                        <li key={i} className='flex items-start gap-2 text-sm leading-relaxed text-zinc-500'>
+                          <span className='mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-zinc-600' />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
               </div>

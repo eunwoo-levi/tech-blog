@@ -22,7 +22,7 @@ export default function SkillsSection() {
                 {group.items.map((item) => (
                   <span
                     key={item}
-                    className='rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-300'
+                    className='rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm font-medium text-zinc-300'
                   >
                     {item}
                   </span>

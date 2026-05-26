@@ -28,29 +28,57 @@ export const activities = [
   },
   {
     title: '2025 ADB APAC Digital Transformation Forum',
-    role: 'Presenter',
-    period: '2025',
+    role: 'Presenter · Live Demo',
+    period: '2025.06',
     icon: '🌏',
-    descriptionKo: '글로벌 CTO들을 대상으로 VitalTrip 프로젝트 발표',
-    descriptionEn: 'Presented the VitalTrip project to global CTOs at the 2025 ADB APAC Digital Transformation Forum',
+    descriptionKo: '마닐라, 필리핀에서 글로벌 CTO들을 대상으로 VitalTrip 프로젝트 발표 및 라이브 데모',
+    descriptionEn: 'Presented and live-demoed the VitalTrip project to global CTOs at the 2025 ADB APAC Digital Transformation Forum in Manila, Philippines',
   },
   {
     title: 'WoowaCourse 7th FE',
     role: 'Woowa Bros.',
     period: '2025.02 - 2025.11',
     icon: '🚀',
+    descriptionKo: [
+      '페어 프로그래밍·현업자 코드 리뷰로 설계 관점 확장 및 TDD·리팩터링 기반 유지보수성 향상',
+      '브라우저 HTTP Client API 발전 흐름·선택 기준 분석 기술 발표 — 우아한테크 테코톡 등재',
+    ],
+    descriptionEn: [
+      'Expanded design perspective through pair programming and senior code reviews; improved maintainability via TDD and refactoring',
+      'Delivered a technical talk on the evolution and selection criteria of browser HTTP Client APIs — featured on Woowa Tech Talk (우아한테크 테코톡)',
+    ],
   },
   {
-    title: 'AI Melaka Co., Ltd.',
-    role: 'Frontend Intern',
+    title: 'AI Melaka',
+    role: 'Frontend Intern · South Korea',
     period: '2024.12 - 2025.02',
     icon: '💼',
+    descriptionKo: [
+      '초기 스타트업에서 AI 콘텐츠 제작 플랫폼의 0→1 제품 개발 담당, 개발·기획·검증을 End-to-End 수행',
+      'Next.js 기반 AI 서비스 MVP에서 사용자 입력과 LLM/API 응답을 연결해 콘텐츠 생성 플로우와 결과 UI 설계·구현',
+      '해외 개발자·디자이너와 협업해 사용자 흐름을 개선하고, 실험·반복 개발 체계를 구축해 2주 조기 런칭 달성',
+    ],
+    descriptionEn: [
+      'Led 0→1 product development of an AI content creation platform at an early-stage startup, owning the full End-to-End cycle across development, planning, and validation',
+      'Designed and implemented the content generation flow and result UI by connecting user inputs with LLM/API responses in a Next.js-based AI service MVP',
+      'Collaborated with overseas developers and designers to improve user flows, established an experiment-driven iteration cycle, and achieved a 2-week early launch',
+    ],
   },
   {
-    title: 'Google Developers Group',
+    title: 'Google Developer Groups',
     role: 'Frontend Developer',
     period: '2024.09 - ongoing',
     icon: '🔥',
+    descriptionKo: [
+      '프론트엔드 스터디 운영 및 멤버 멘토링으로 커뮤니티 기술 역량 향상에 기여',
+      'Google I/O, Cloud Next 등 주요 Google 기술 이벤트 참여 및 Google 엔지니어·개발자 네트워킹',
+      '커뮤니티 내 테크 세션 발표 — 최신 웹 기술 트렌드 및 실전 개발 경험 공유',
+    ],
+    descriptionEn: [
+      'Led frontend study groups and mentored members to strengthen community-wide technical skills',
+      'Participated in key Google tech events (Google I/O, Cloud Next) and built networks with Google engineers and developers worldwide',
+      'Delivered tech sessions within the community — sharing the latest web technology trends and hands-on development insights',
+    ],
   },
   {
     title: 'Korean Augmentation To the United States Army (KATUSA)',
@@ -94,10 +122,10 @@ export const contributions = [
 ];
 
 export const awards = [
-  { title: '2026 KIISE ASK Conference — LLM Research Division', prize: '🥉 Bronze' },
-  { title: '2025 Google Asia-Pacific Solution Challenge', prize: '🏆 Top 10' },
+  { title: '2026 LLM Research Competition — Korea Information Processing Society ASK', prize: '🥉 3rd Place' },
+  { title: '2025 Google Asia-Pacific Solution Challenge', prize: '🏆 Global Top 10' },
   { title: '2025 Google New Year Hackathon', prize: '🥈 2nd Place' },
-  { title: '2024 Daehyeong Region Collegiate SW Hackathon', prize: '🥉 3rd Place' },
+  { title: '2024 Daehyeong Region Collegiate SW Hackathon', prize: '4th Place' },
 ];
 
 export const projects = [
@@ -111,6 +139,7 @@ export const projects = [
     period: '2025.07 - ongoing',
     url: 'https://connectingmoment.com/',
     tags: ['Social', 'Network', 'Emotion'],
+    image: '/portfolio/moment.webp',
   },
   {
     title: 'VitalTrip',
@@ -122,6 +151,7 @@ export const projects = [
     period: '2025.06 - ongoing',
     url: 'https://aivitaltrip.com/',
     tags: ['Google', 'AI', 'Healthcare'],
+    image: '/portfolio/vitaltrip.webp',
   },
   {
     title: 'Debate Timer Service',
@@ -129,6 +159,7 @@ export const projects = [
     period: '2024.12 - 2025.03',
     url: 'https://www.debate-timer.com/en/home',
     tags: ['React', 'Timer', 'Service'],
+    image: '/portfolio/timer.webp',
   },
   {
     title: 'Architect Web Application',
@@ -136,12 +167,14 @@ export const projects = [
     period: '2024.09 - 2024.11',
     url: 'https://www.daegu-jinsung.com/',
     tags: ['Commercial', 'Architecture', 'Web'],
+    image: '/portfolio/architect.webp',
   },
   {
     title: 'Personal Portfolio & Tech Blog',
     description: 'Built with Next.js, TypeScript, and Tailwind CSS',
-    period: '2024.08',
+    period: '2024.08 - ongoing',
     url: 'https://www.eunwoo-levi.com/',
     tags: ['Next.js', 'Blog', 'Portfolio'],
+    image: '/portfolio/blog.webp',
   },
 ];

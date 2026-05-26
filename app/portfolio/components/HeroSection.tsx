@@ -32,7 +32,7 @@ export default function HeroSection() {
 
       <div className='relative mx-auto max-w-4xl'>
         <p
-          className='mb-3 text-xs font-medium uppercase tracking-widest text-zinc-500'
+          className='mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500'
           style={fu(0.1)}
         >
           Frontend Engineer
@@ -43,14 +43,17 @@ export default function HeroSection() {
         >
           {tr.hero.name}
         </h1>
-        <p className='mt-5 text-base leading-relaxed text-zinc-400' style={fu(0.4)}>
+        <p className='mt-5 text-lg leading-relaxed text-zinc-400' style={fu(0.4)}>
           {tr.hero.desc1}
         </p>
-        <p className='mt-2 text-base text-zinc-500' style={fu(0.52)}>
+        <p className='mt-2 text-lg text-zinc-500' style={fu(0.52)}>
           {tr.hero.desc2}
         </p>
+        <p className='mt-2 text-lg text-zinc-500' style={fu(0.62)}>
+          {tr.hero.desc3}
+        </p>
         <div
-          className='mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-zinc-500'
+          className='mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-base text-zinc-500'
           style={fu(0.64)}
         >
           <span className='flex items-center gap-1.5'>
