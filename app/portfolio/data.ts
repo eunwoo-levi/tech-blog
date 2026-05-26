@@ -138,7 +138,7 @@ export const projects = [
       'A global medical support service providing location-based medical facility search and AI emergency response in overseas emergencies. Led full-stack development from planning to deployment — selected as a Top 10 Global Finalist at the 2025 Google APAC Solution Challenge.',
     period: '2025.06 - ongoing',
     url: 'https://aivitaltrip.com/',
-    tags: ['Next.js', 'React', 'TypeScript', 'NestJS', 'MySQL', 'Playwright', 'Zustand', 'Tailwind'],
+    tags: ['Next.js', 'React', 'TypeScript', 'NestJS', 'MySQL', 'Playwright', 'Zustand', 'Tailwind', 'AWS S3', 'CloudFront', 'EC2', 'Docker', 'RAG'],
     image: '/portfolio/vitaltrip.webp',
   },
   {
@@ -150,7 +150,7 @@ export const projects = [
       'An anonymous-based social network service. Led frontend development, extended the web service into a WebView-based app, and improved UX and operational structure based on user test feedback.',
     period: '2025.07 - 2026.05',
     url: 'https://connectingmoment.com/',
-    tags: ['React', 'TypeScript', 'TanStack Query', 'Webpack', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
+    tags: ['React', 'TypeScript', 'TanStack Query', 'Webpack', 'Emotion', 'Jest', 'Cypress', 'Storybook', 'AWS CodePipeline', 'S3', 'CloudFront', 'Lambda'],
     image: '/portfolio/moment.webp',
   },
   {
