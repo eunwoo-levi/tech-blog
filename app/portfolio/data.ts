@@ -130,18 +130,6 @@ export const awards = [
 
 export const projects = [
   {
-    title: 'Moment',
-    description: 'WoowaCourse Team Project',
-    detail:
-      '익명 기반 소셜 네트워크 서비스입니다. 프론트엔드 개발을 담당하며 웹 서비스를 WebView 기반 앱으로 확장하고, 사용자 테스트 피드백을 반영해 웹·앱 전반의 UX와 운영 구조를 개선했습니다.',
-    detailEn:
-      'An anonymous-based social network service. Led frontend development, extended the web service into a WebView-based app, and improved UX and operational structure based on user test feedback.',
-    period: '2025.07 - ongoing',
-    url: 'https://connectingmoment.com/',
-    tags: ['Social', 'Network', 'Emotion'],
-    image: '/portfolio/moment.webp',
-  },
-  {
     title: 'VitalTrip',
     description: '2025 Google Asia-Pacific Solution Challenge',
     detail:
@@ -152,6 +140,18 @@ export const projects = [
     url: 'https://aivitaltrip.com/',
     tags: ['Google', 'AI', 'Healthcare'],
     image: '/portfolio/vitaltrip.webp',
+  },
+  {
+    title: 'Moment',
+    description: 'WoowaCourse Team Project',
+    detail:
+      '익명 기반 소셜 네트워크 서비스입니다. 프론트엔드 개발을 담당하며 웹 서비스를 WebView 기반 앱으로 확장하고, 사용자 테스트 피드백을 반영해 웹·앱 전반의 UX와 운영 구조를 개선했습니다.',
+    detailEn:
+      'An anonymous-based social network service. Led frontend development, extended the web service into a WebView-based app, and improved UX and operational structure based on user test feedback.',
+    period: '2025.07 - 2026.05',
+    url: 'https://connectingmoment.com/',
+    tags: ['Social', 'Network', 'Emotion'],
+    image: '/portfolio/moment.webp',
   },
   {
     title: 'Debate Timer Service',
