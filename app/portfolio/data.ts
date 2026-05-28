@@ -4,12 +4,12 @@ export const skills = [
     items: ['JavaScript', 'TypeScript', 'C++', 'HTML', 'CSS', 'Python'],
   },
   {
-    category: 'Frameworks & Libraries',
-    items: ['React', 'Next.js', 'NestJS', 'TanStack Query', 'Zustand', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
+    category: 'Frontend',
+    items: ['React', 'Next.js', 'TanStack Query', 'Zustand', 'Emotion', 'Jest', 'Cypress', 'Storybook'],
   },
   {
     category: 'Backend & Infra',
-    items: ['MySQL', 'Docker', 'AWS S3', 'CloudFront', 'EC2', 'Lambda', 'CodePipeline', 'GitHub Actions'],
+    items: ['NestJS', 'MySQL', 'Docker', 'AWS S3', 'CloudFront', 'EC2', 'Lambda', 'CodePipeline', 'GitHub Actions'],
   },
   {
     category: 'Tools',
@@ -18,6 +18,20 @@ export const skills = [
 ];
 
 export const activities = [
+  {
+    title: 'WoowaCourse 7th FE',
+    role: 'Woowa Bros.',
+    period: '2025.02 - 2025.11',
+    icon: '🚀',
+    descriptionKo: [
+      '페어 프로그래밍·현업자 코드 리뷰로 설계 관점 확장 및 TDD·리팩터링 기반 유지보수성 향상',
+      '브라우저 HTTP Client API 발전 흐름·선택 기준 분석 기술 발표 — 우아한테크 테코톡 등재',
+    ],
+    descriptionEn: [
+      'Expanded design perspective through pair programming and senior code reviews; improved maintainability via TDD and refactoring',
+      'Delivered a technical talk on the evolution and selection criteria of browser HTTP Client APIs — featured on Woowa Tech Talk (우아한테크 테코톡)',
+    ],
+  },
   {
     title: 'Google Asia-Pacific Solution Challenge',
     role: 'Top 10 Global Finalist',
@@ -33,20 +47,6 @@ export const activities = [
     icon: '🌏',
     descriptionKo: '마닐라, 필리핀에서 글로벌 CTO들을 대상으로 VitalTrip 프로젝트 발표 및 라이브 데모',
     descriptionEn: 'Presented and live-demoed the VitalTrip project to global CTOs at the 2025 ADB APAC Digital Transformation Forum in Manila, Philippines',
-  },
-  {
-    title: 'WoowaCourse 7th FE',
-    role: 'Woowa Bros.',
-    period: '2025.02 - 2025.11',
-    icon: '🚀',
-    descriptionKo: [
-      '페어 프로그래밍·현업자 코드 리뷰로 설계 관점 확장 및 TDD·리팩터링 기반 유지보수성 향상',
-      '브라우저 HTTP Client API 발전 흐름·선택 기준 분석 기술 발표 — 우아한테크 테코톡 등재',
-    ],
-    descriptionEn: [
-      'Expanded design perspective through pair programming and senior code reviews; improved maintainability via TDD and refactoring',
-      'Delivered a technical talk on the evolution and selection criteria of browser HTTP Client APIs — featured on Woowa Tech Talk (우아한테크 테코톡)',
-    ],
   },
   {
     title: 'AI Melaka',
