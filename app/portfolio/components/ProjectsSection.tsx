@@ -51,15 +51,15 @@ export default function ProjectsSection() {
                         <h3 className='text-lg font-semibold text-zinc-100 transition-colors group-hover:text-sky-400'>
                           {project.title}
                         </h3>
-                        <p className='mt-0.5 text-sm font-medium text-zinc-500'>
+                        <p className='mt-0.5 text-sm font-medium text-zinc-400'>
                           {project.description}
                         </p>
                       </div>
-                      <ArrowUpRight className='mt-0.5 h-5 w-5 flex-shrink-0 text-zinc-600 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-sky-400' />
+                      <ArrowUpRight className='mt-0.5 h-5 w-5 flex-shrink-0 text-zinc-500 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-sky-400' />
                     </div>
 
                     {detail && (
-                      <p className='mt-1 text-sm leading-relaxed text-zinc-400'>{detail}</p>
+                      <p className='mt-1 text-sm leading-relaxed text-zinc-300'>{detail}</p>
                     )}
                   </div>
 
@@ -68,13 +68,13 @@ export default function ProjectsSection() {
                       {project.tags.map((tag) => (
                         <span
                           key={tag}
-                          className='rounded-md border border-zinc-700/60 bg-zinc-800/60 px-2 py-0.5 text-xs font-medium text-zinc-400'
+                          className='rounded-md border border-zinc-700/60 bg-zinc-800/60 px-2 py-0.5 text-xs font-medium text-zinc-300'
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
-                    <span className='flex-shrink-0 text-xs text-zinc-600'>{project.period}</span>
+                    <span className='flex-shrink-0 text-xs text-zinc-500'>{project.period}</span>
                   </div>
                 </div>
               </a>

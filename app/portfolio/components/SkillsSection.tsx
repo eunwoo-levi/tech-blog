@@ -15,14 +15,14 @@ export default function SkillsSection() {
         <div className='flex flex-col gap-6'>
           {skills.map((group) => (
             <div key={group.category} className='flex flex-col gap-3 sm:flex-row sm:gap-8'>
-              <span className='w-44 flex-shrink-0 text-xs font-medium uppercase tracking-widest text-zinc-500'>
+              <span className='w-44 flex-shrink-0 text-xs font-medium uppercase tracking-widest text-zinc-400'>
                 {group.category}
               </span>
               <div className='flex flex-wrap gap-2'>
                 {group.items.map((item) => (
                   <span
                     key={item}
-                    className='rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm font-medium text-zinc-300'
+                    className='rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm font-medium text-zinc-200'
                   >
                     {item}
                   </span>
