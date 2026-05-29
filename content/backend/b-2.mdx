@@ -1,0 +1,478 @@
+---
+title: '[Backend] Event-Driven Architecture로 요청 처리 흐름 분리하기'
+author: 'Eunwoo'
+thumbnail: '/thumbnail/nestjs.webp'
+publishDate: '2026-05-29'
+categoryId: 8
+keywords: ['Backend', 'NestJS', 'Event-Driven', 'EventEmitter', '비동기 처리', 'Loose Coupling']
+description: '응급처치 조언 API에서 사용자 응답에 필요한 핵심 작업과 로그 저장 같은 부가 작업을 분리하기 위해 Event-Driven 구조를 적용한 과정을 정리합니다.'
+---
+
+> 이 글에서는 NestJS를 사용하여 Event-Driven 구조로 요청 처리 흐름을 분리하는 방법에 대해 설명합니다. 핵심 비즈니스 로직과 부가 작업을 어떻게 분리할 수 있는지, 그리고 이를 통해 얻을 수 있는 이점에 대해 다룹니다.
+
+백엔드 API를 구현하다 보면 하나의 요청 안에서 여러 작업이 연달아 실행되는 경우가 많다.
+예를 들어 어떤 API가 다음과 같은 일을 한다고 해보자.
+
+클라이언트 요청
+→ 핵심 비즈니스 로직 실행
+→ 로그 저장
+→ 알림 발송
+→ 통계 데이터 수집
+→ 응답 반환
+
+처음에는 이 구조가 자연스러워 보인다.
+요청이 들어왔고, 필요한 작업들을 순서대로 처리한 뒤 응답을 반환하면 되기 때문이다.
+하지만 작업이 많아질수록 한 가지 문제가 생긴다.
+
+모든 작업을 사용자가 기다려야 할까?
+사용자 응답에 꼭 필요한 작업이 있고, 그렇지 않은 작업도 있다.
+
+- 사용자가 기다려야 하는 작업
+  - → 요청을 처리하기 위한 핵심 로직
+
+- 사용자가 반드시 기다리지 않아도 되는 작업
+  - → 로그 저장, 알림 발송, 통계 수집, 분석 데이터 저장
+
+로그 저장이나 통계 수집은 서비스 운영에 중요하다.
+하지만 대부분의 경우 사용자 응답을 반환하기 전에 반드시 완료되어야 하는 작업은 아니다.
+
+그런데 이런 작업들이 핵심 로직 안에 직접 들어가면, 사용자는 부가 작업이 끝날 때까지 기다려야 한다.
+
+```ts
+async createPost(dto: CreatePostDto) {
+  const post = await this.postRepository.save(dto);
+
+  await this.logService.save(post);
+  await this.notificationService.send(post);
+  await this.analyticsService.track(post);
+
+  return post;
+}
+```
+
+이 코드는 직관적이지만, 시간이 지나면서 점점 무거워진다.
+
+핵심 로직은 게시글 생성인데, 로그 저장, 알림 발송, 분석 이벤트 기록까지 모두 알고 있어야 한다.
+즉, 하나의 함수가 너무 많은 책임을 갖게 된다.
+
+이런 문제를 해결하기 위해 고민할 수 있는 방식 중 하나가 `Event-Driven`이다.
+
+# Event-Driven이란 무엇인가?
+
+Event-Driven은 말 그대로 이벤트를 중심으로 동작하는 구조다.
+
+여기서 이벤트는 어렵게 생각할 필요가 없다.
+
+> 이벤트는 "어떤 일이 발생했다"는 사실을 표현한 신호다.
+
+예를 들면 이런 것들이 이벤트가 될 수 있다.
+
+- 회원가입이 완료되었다
+- 게시글이 생성되었다
+- 결제가 완료되었다
+- 파일 업로드가 끝났다
+- AI 조언 요청이 완료되었다
+
+기존 방식에서는 어떤 작업이 끝난 뒤 다음 작업을 직접 호출한다.
+
+```ts
+await this.logService.save();
+await this.notificationService.send();
+await this.analyticsService.track();
+```
+
+반면 Event-Driven 방식에서는 직접 호출하지 않는다.
+대신 "이 일이 발생했다"는 이벤트를 발행한다.
+
+```ts
+this.eventEmitter.emit('post.created', event);
+```
+
+그리고 이 이벤트에 관심 있는 로직들이 각자 반응한다.
+
+```
+post.created 이벤트 발생
+├── LogListener: 로그 저장
+├── NotificationListener: 알림 발송
+└── AnalyticsListener: 분석 데이터 수집
+```
+
+즉, Event-Driven은 다음과 같이 정리할 수 있다.
+
+> 어떤 일이 발생했다는 사실을 이벤트로 알리고, 그 이벤트에 관심 있는 로직들이 독립적으로 반응하게 만드는 구조
+
+핵심은 직접 호출하지 않는 것이다.
+
+이벤트를 발행하는 쪽은 누가 이 이벤트를 처리하는지 몰라도 된다.
+반대로 이벤트를 처리하는 쪽은 이벤트가 발생했을 때 자기 역할만 수행하면 된다.
+
+# 기존 직접 호출 방식의 한계
+
+Event-Driven을 이해하려면 먼저 직접 호출 방식의 한계를 보는 것이 좋다.
+
+가장 단순한 방식은 하나의 서비스에서 필요한 후속 작업을 모두 호출하는 것이다.
+
+```ts
+async signup(dto: SignupDto) {
+  const user = await this.userService.create(dto);
+
+  await this.emailService.sendWelcomeEmail(user);
+  await this.slackService.notifySignup(user);
+  await this.analyticsService.trackSignup(user);
+
+  return user;
+}
+```
+
+이 코드는 한눈에 흐름이 보인다는 장점이 있다.
+하지만 요구사항이 늘어날수록 문제가 생긴다.
+
+## 1. 서비스가 너무 많은 책임을 가진다
+
+`signup()`의 핵심 책임은 회원가입이다.
+그런데 이메일 발송, 슬랙 알림, 분석 이벤트 기록까지 모두 직접 처리하고 있다.
+결국 `signup()`은 회원가입 로직뿐만 아니라 회원가입 이후의 모든 후속 작업을 알고 있어야 한다.
+이런 구조에서는 후속 작업이 추가될 때마다 핵심 서비스 코드를 계속 수정해야 한다.
+
+```ts
+await this.couponService.issueWelcomeCoupon(user);
+await this.crmService.syncUser(user);
+await this.pushService.send(user);
+```
+
+처음에는 괜찮아 보여도, 시간이 지나면 핵심 로직과 후속 로직이 섞이게 된다.
+
+## 2. 부가 작업의 실패가 전체 요청에 영향을 줄 수 있다
+
+예를 들어 회원가입은 성공했는데 웰컴 이메일 발송에 실패했다고 해보자.
+
+```
+회원가입 성공
+→ 이메일 발송 실패
+→ API 전체 실패 가능
+```
+
+사용자 입장에서는 이미 회원가입이 완료되었는데, 이메일 발송 실패 때문에 요청이 실패한 것처럼 보일 수 있다.
+
+물론 이메일 발송 실패를 반드시 요청 실패로 처리해야 하는 경우도 있다.
+하지만 그렇지 않은 경우라면 핵심 로직과 후속 작업의 실패를 분리하는 것이 더 자연스럽다.
+
+## 3. 확장성이 떨어진다
+
+후속 작업이 하나일 때는 직접 호출해도 큰 문제가 없다.
+하지만 하나의 이벤트 이후 여러 작업이 붙기 시작하면 코드가 점점 복잡해진다.
+
+```
+회원가입 완료
+├── 웰컴 이메일 발송
+├── 가입 쿠폰 발급
+├── 슬랙 알림
+├── CRM 연동
+└── 분석 이벤트 기록
+```
+
+이 모든 작업을 회원가입 서비스가 직접 알고 호출한다면, 회원가입 서비스는 점점 비대해진다.
+Event-Driven은 이런 후속 작업들을 이벤트 기준으로 분리할 수 있게 해준다.
+
+# Event-Driven의 핵심 구조
+
+Event-Driven은 보통 세 가지 요소로 구성된다.
+
+| 구성 요소 | 역할                        |
+| --------- | --------------------------- |
+| Publisher | 이벤트를 발행하는 주체      |
+| Event     | 발생한 일을 표현하는 데이터 |
+| Listener  | 이벤트를 받아 처리하는 주체 |
+
+예를 들어 게시글 생성 상황을 보면 다음과 같다.
+
+- Publisher
+  - → PostService
+
+- Event
+  - → post.created
+
+- Listener
+  - → LogListener, NotificationListener, AnalyticsListener
+
+흐름은 다음과 같다.
+
+```
+PostService
+→ post.created 이벤트 발행
+→ Listener들이 이벤트를 받아 각자 처리
+```
+
+코드로 보면 이런 느낌이다.
+
+```ts
+this.eventEmitter.emit('post.created', {
+  postId: post.id,
+  authorId: post.authorId,
+  createdAt: post.createdAt,
+});
+```
+
+이벤트를 받은 Listener는 자기 역할만 수행한다.
+
+```ts
+@OnEvent('post.created')
+async handlePostCreated(event: PostCreatedEvent) {
+  await this.logService.save(event);
+}
+```
+
+다른 Listener도 같은 이벤트를 구독할 수 있다.
+
+```ts
+@OnEvent('post.created')
+async sendNotification(event: PostCreatedEvent) {
+  await this.notificationService.send(event);
+}
+```
+
+여기서 중요한 점은 PostService가 LogListener나 NotificationListener를 직접 알지 않아도 된다는 것이다.
+
+- PostService는 이벤트만 발행한다.
+- Listener들은 이벤트를 듣고 각자 반응한다.
+
+이 구조 덕분에 후속 작업을 추가하더라도 Publisher의 코드를 크게 수정하지 않아도 된다.
+
+# NestJS에서 Event-Driven 적용하기
+
+NestJS에서는 `@nestjs/event-emitter`를 사용해 애플리케이션 내부에서 이벤트 기반 구조를 쉽게 만들 수 있다.
+
+먼저 패키지를 설치한다.
+
+```bash
+pnpm add @nestjs/event-emitter
+```
+
+그리고 모듈에 등록한다.
+
+```ts
+// app.module.ts
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
+@Module({
+  imports: [EventEmitterModule.forRoot()],
+})
+export class AppModule {}
+```
+
+이후 이벤트를 발행할 서비스에서 `EventEmitter2`를 주입받아 사용한다.
+
+```ts
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+@Injectable()
+export class PostService {
+  constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  async createPost(dto: CreatePostDto) {
+    const post = await this.postRepository.save(dto);
+
+    this.eventEmitter.emit('post.created', {
+      postId: post.id,
+      authorId: post.authorId,
+    });
+
+    return post;
+  }
+}
+```
+
+이벤트를 처리하는 쪽에서는 `@OnEvent()` 데코레이터를 사용한다.
+
+```ts
+import { OnEvent } from '@nestjs/event-emitter';
+
+@Injectable()
+export class PostLogListener {
+  @OnEvent('post.created')
+  async handlePostCreated(event: PostCreatedEvent) {
+    await this.logService.save(event);
+  }
+}
+```
+
+이렇게 하면 PostService는 로그 저장을 직접 호출하지 않는다.
+대신 post.created 이벤트만 발행한다.
+
+로그 저장은 PostLogListener가 담당한다.
+
+# 실제 적용 예시
+
+[VitalTrip](https://aivitaltrip.com) 내가 적용한 사례도 이 구조와 같다.
+응급처치 조언 API에서 사용자가 요청을 보내면, 핵심 흐름은 다음과 같다.
+
+```
+요청 수신
+→ 국가 코드 조회
+→ 응급번호 조회
+→ AI 조언 생성
+→ 응답 반환
+```
+
+여기에 요청 로그 저장이 필요했다.
+
+하지만 로그 저장은 사용자 응답에 반드시 포함되어야 하는 작업은 아니었다.
+그래서 응답 흐름 안에서 직접 저장하지 않고, 조언 요청이 완료되었다는 이벤트를 발행하도록 분리했다.
+
+실제 흐름은 다음과 같다.
+
+- FirstAidService
+  - → AI 조언 결과 생성
+  - → first-aid.advice.completed 이벤트 발행
+  - → 응답 반환
+
+- FirstAidLogListener
+  - → first-aid.advice.completed 이벤트 수신
+  - → first_aid_logs 테이블에 로그 저장
+
+즉, FirstAidService는 로그 저장을 직접 담당하지 않는다.
+응급처치 조언 요청이 완료되었다는 사실만 이벤트로 알린다.
+
+이후 FirstAidLogListener가 이벤트를 받아 로그를 저장한다.
+실제 구현에서도 AI 응답 반환 이후 first-aid.advice.completed 이벤트를 발행하고, Listener가 first_aid_logs 테이블에 저장하는 방식으로 분리했다.
+
+## 이벤트 정의
+
+```ts
+export const FIRST_AID_ADVICE_COMPLETED = 'first-aid.advice.completed';
+
+export class FirstAidAdviceCompletedEvent {
+  userId?: number;
+  symptomType: SymptomType;
+  countryCode: string;
+  confidence: number;
+}
+```
+
+이벤트 이름은 상수로 분리했다.
+문자열을 여러 곳에 직접 작성하면 오타가 발생할 수 있고, 이벤트 이름이 변경될 때 수정 지점이 늘어난다.
+
+```ts
+this.eventEmitter.emit(FIRST_AID_ADVICE_COMPLETED, event);
+```
+
+또한 이벤트 데이터를 클래스로 정의해, 해당 이벤트가 어떤 정보를 전달하는지 명확하게 했다.
+
+## Publisher
+
+```ts
+@Injectable()
+export class FirstAidService {
+  constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  async getAdvice(dto: AdviceRequestDto, userId?: number) {
+    const aiResult = await this.openAiService.getAdvice(
+      dto.symptomType,
+      dto.symptomDetail,
+      countryCode,
+    );
+
+    const event = new FirstAidAdviceCompletedEvent();
+    event.userId = userId;
+    event.symptomType = dto.symptomType;
+    event.countryCode = countryCode;
+    event.confidence = aiResult.confidence;
+
+    this.eventEmitter.emit(FIRST_AID_ADVICE_COMPLETED, event);
+
+    return {
+      advice: aiResult.advice,
+      confidence: aiResult.confidence,
+    };
+  }
+}
+```
+
+핵심은 이 부분이다.
+
+```ts
+this.eventEmitter.emit(FIRST_AID_ADVICE_COMPLETED, event);
+```
+
+FirstAidService는 로그 저장을 직접 호출하지 않는다.
+이벤트를 발행하고 자신의 책임을 끝낸다.
+
+## Listener
+
+```ts
+@Injectable()
+export class FirstAidLogListener {
+  private readonly logger = new Logger(FirstAidLogListener.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  @OnEvent(FIRST_AID_ADVICE_COMPLETED)
+  async handleAdviceCompleted(event: FirstAidAdviceCompletedEvent) {
+    try {
+      await this.prisma.firstAidLog.create({
+        data: {
+          userId: event.userId ?? null,
+          symptomType: event.symptomType,
+          countryCode: event.countryCode,
+          confidence: event.confidence,
+        },
+      });
+    } catch (err) {
+      this.logger.error('first-aid 로그 저장 실패', err);
+    }
+  }
+}
+```
+
+Listener는 이벤트를 받아 로그 저장만 담당한다.
+여기서 `try-catch`를 사용한 이유는 로그 저장 실패가 사용자 응답 실패로 이어지지 않도록 하기 위해서다.
+
+- AI 조언 생성 실패
+  - → 사용자 응답에 영향을 주는 실패
+
+- 로그 저장 실패
+  - → 내부적으로 확인하면 되는 실패
+
+이렇게 실패의 성격이 다른 작업을 분리할 수 있었다.
+
+# 마무리
+
+Event-Driven은 단순히 "비동기로 처리하는 방법"이 아니다.
+
+더 정확히는,
+
+> 어떤 일이 발생했다는 사실을 이벤트로 표현하고, 그 이벤트에 관심 있는 로직들이 독립적으로 반응하게 만드는 구조
+
+라고 볼 수 있다.
+
+직접 호출 방식에서는 하나의 서비스가 후속 작업을 모두 알고 있어야 한다.
+
+```
+Service
+→ LogService 직접 호출
+→ NotificationService 직접 호출
+→ AnalyticsService 직접 호출
+```
+
+반면 Event-Driven 방식에서는 서비스가 이벤트만 발행한다.
+
+```
+Service
+→ 이벤트 발행
+→ Listener들이 각자 반응
+```
+
+이 구조를 사용하면 핵심 로직과 후속 작업을 분리할 수 있고, 후속 작업이 추가되더라도 기존 서비스 코드를 크게 수정하지 않아도 된다.
+
+물론 모든 상황에 Event-Driven이 적합한 것은 아니다.
+결과를 즉시 응답에 포함해야 하는 작업이나, 강한 `트랜잭션` 일관성이 필요한 작업에는 신중해야 한다.
+또한 이벤트 기반 구조는 실행 흐름이 코드상에서 바로 보이지 않을 수 있기 때문에 이벤트 이름, 파일 구조, 로깅을 명확하게 관리해야 한다.
+
+이번 적용에서는 사용자 응답에 직접 필요하지 않은 로그 저장을 이벤트 기반으로 분리했다.
+그 결과 핵심 서비스는 응급처치 조언 생성에 집중하고, 로그 저장은 Listener가 독립적으로 처리하도록 만들 수 있었다.
+
+정리하면 Event-Driven의 핵심은 이것이다.
+
+> 직접 호출하지 않고, 발생한 일을 이벤트로 알린 뒤, 필요한 로직들이 독립적으로 반응하게 만드는 것
+
+이 관점으로 보면 Event-Driven은 단순한 비동기 처리 기법이 아니라, 백엔드 로직의 책임을 분리하고 확장성을 높이는 설계 방식에 가깝다.
