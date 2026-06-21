@@ -1,0 +1,615 @@
+---
+title: '[Next.js] 프론트엔드의 Next.js 캐싱 완전 정복하기'
+author: 'Eunwoo'
+thumbnail: '/thumbnail/nextjs.webp'
+publishDate: '2026-06-22'
+categoryId: 5
+keywords:
+  [
+    'Next.js',
+    '캐싱',
+    'ISR',
+    'SSG',
+    'SSR',
+    '캐시 전략',
+    '성능 최적화',
+    'Next.js 캐싱',
+    'Request Memoization',
+    'Data Cache',
+    'Full Route Cache',
+    'Router Cache',
+    'Edge Cache',
+    'CDN Cache',
+  ]
+description: 'Next.js에서 제공하는 다양한 캐싱 전략과 이를 활용하여 웹 애플리케이션의 성능을 최적화하는 방법에 대해 자세히 설명합니다.'
+---
+
+Next.js를 공부하다 보면 처음에는 렌더링 방식만 이해하면 될 것처럼 느껴진다.
+
+Pages Router를 사용할 때는 비교적 단순했다.
+
+- `getServerSideProps`를 쓰면 SSR
+- `getStaticProps`를 쓰면 SSG
+- `revalidate`를 넣으면 ISR
+
+그런데 App Router로 넘어오면 이야기가 달라진다.
+
+`fetch`에 `cache: 'no-store'`를 넣기도 하고, `next: { revalidate: 60 }`을 넣기도 한다. Server Component에서는 같은 API를 여러 컴포넌트에서 호출해도 중복 요청이 나가지 않는다고 한다.
+또 어떤 글에서는 Data Cache, Full Route Cache, Router Cache, RSC Payload 같은 용어가 계속 등장한다.
+
+처음에는 이것들이 전부 비슷한 "캐시"처럼 보였다. 하지만 실제로 디버깅을 해보면 상황이 다르다.
+
+"API 응답은 바뀌었는데 화면이 그대로인 이유"와 "페이지 이동 시 이전 화면이 보이는 이유"는 서로 다른 캐시에서 발생할 수 있다. 서버 캐시를 무효화했는데도 브라우저에서 이전 RSC Payload를 재사용하고 있을 수도 있고, 반대로 브라우저를 새로고침했는데 서버의 Data Cache가 아직 살아있을 수도 있다.
+
+그래서 Next.js 캐싱은 API 이름을 외우기보다 **캐시가 어느 위치에 있고, 무엇을 저장하며, 언제 무효화되는지**를 기준으로 이해해야 한다.
+
+이 글에서는 Next.js App Router의 핵심 캐시를 4가지로 나누어 정리한다.
+
+1. Request Memoization
+2. Data Cache
+3. Full Route Cache
+4. Router Cache
+
+> 이 글은 Next.js App Router의 기존 캐싱 모델을 기준으로 작성했다. Next.js 16부터는 `cacheComponents` 플래그를 사용하는 Cache Components 모델도 제공되므로, 프로젝트 설정에 따라 공식 문서를 함께 확인하는 것이 좋다.
+
+---
+
+# 먼저 전체 지도를 보자
+
+Next.js 캐싱이 헷갈리는 이유는 캐시가 하나가 아니기 때문이다.
+
+다음 그림처럼 사용자 요청은 여러 캐시 레이어를 거칠 수 있다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/3902a8b6-63fd-4226-947f-0cff5faf736b/image.png)
+
+각 캐시는 저장하는 대상이 다르다.
+
+| 캐시                | 저장 위치                                | 저장 대상                     | 핵심 역할                 | 지속 시간                            |
+| ------------------- | ---------------------------------------- | ----------------------------- | ------------------------- | ------------------------------------ |
+| Request Memoization | 서버 메모리                              | 같은 렌더링 안의 `fetch` 결과 | 중복 요청 제거            | 하나의 렌더링 동안만                 |
+| Data Cache          | 서버 또는 배포 플랫폼의 persistent cache | `fetch` 응답                  | 서버에서 데이터 재사용    | `revalidate` 또는 수동 무효화 전까지 |
+| Full Route Cache    | 서버                                     | HTML + RSC Payload            | 페이지 렌더링 결과 재사용 | 재검증 또는 재배포 전까지            |
+| Router Cache        | 브라우저 메모리                          | RSC Payload                   | 빠른 페이지 이동          | 세션, 자동 만료 시간                 |
+
+한 줄로 줄이면 이렇게 볼 수 있다.
+
+```txt
+Request Memoization = 같은 렌더링 안에서 중복 요청하지 않기
+Data Cache          = fetch 응답을 서버에 저장하기
+Full Route Cache    = 페이지 렌더링 결과를 서버에 저장하기
+Router Cache        = 방문한 페이지의 RSC Payload를 브라우저에 저장하기
+```
+
+---
+
+# Request Memoization: 같은 렌더링 안에서 중복 요청 제거
+
+Request Memoization은 가장 짧게 살아있는 캐시다.
+
+하나의 서버 렌더링 과정에서 동일한 `fetch` 요청이 여러 번 발생하면, Next.js는 실제 요청을 한 번만 보내고 결과를 재사용한다.
+
+예를 들어 페이지와 하위 컴포넌트가 같은 상품 정보를 각각 가져온다고 해보자.
+
+```tsx
+async function getProduct(id: string) {
+  const res = await fetch(`https://api.example.com/products/${id}`);
+  return res.json();
+}
+
+export default async function ProductPage({ params }: { params: { id: string } }) {
+  const product = await getProduct(params.id);
+
+  return (
+    <main>
+      <ProductHeader id={params.id} />
+      <ProductDetail product={product} />
+    </main>
+  );
+}
+
+async function ProductHeader({ id }: { id: string }) {
+  const product = await getProduct(id);
+  return <h1>{product.name}</h1>;
+}
+```
+
+코드만 보면 `getProduct()`가 두 번 실행되므로 네트워크 요청도 두 번 나갈 것 같다. 하지만 같은 렌더링 안에서 동일한 `fetch`라면 실제 요청은 한 번만 실행된다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/29803766-af67-4245-ab6c-4a4c240063ea/image.png)
+
+여기서 중요한 점은 Request Memoization이 오래 유지되는 캐시가 아니라는 것이다.
+
+렌더링이 끝나면 사라진다.
+
+```txt
+A 사용자의 요청
+→ 렌더링 중복 fetch 제거
+→ 렌더링 종료 후 메모이제이션 삭제
+
+B 사용자의 요청
+→ 새로운 렌더링 시작
+→ 다시 메모이제이션 생성
+```
+
+따라서 Request Memoization은 성능 최적화라기보다 **렌더링 중복 호출 방지 장치**에 가깝다.
+
+### `fetch`가 아닌 함수는 `cache()`로 감싸기
+
+`fetch`는 자동으로 메모이제이션되지만, ORM이나 커스텀 HTTP client를 쓰는 함수는 직접 감싸는 편이 안전하다.
+
+```tsx
+import { cache } from 'react';
+
+export const getUser = cache(async (id: string) => {
+  return db.user.findUnique({ where: { id } });
+});
+```
+
+이렇게 하면 같은 렌더링 과정에서 `getUser(id)`가 여러 번 호출되어도 중복 실행을 줄일 수 있다.
+
+### TanStack Query와의 차이
+
+Request Memoization은 TanStack Query와 다르다.
+
+| 비교      | Request Memoization        | TanStack Query                         |
+| --------- | -------------------------- | -------------------------------------- |
+| 실행 위치 | 서버 렌더링 중             | 브라우저                               |
+| 캐시 범위 | 하나의 렌더링 사이클       | 현재 사용자 세션                       |
+| 목적      | 서버 렌더링 중복 호출 제거 | 클라이언트 데이터 재사용, refetch 제어 |
+| 지속 시간 | 렌더링이 끝나면 제거       | 설정에 따라 유지                       |
+
+즉, Request Memoization은 “서버에서 한 번 렌더링하는 동안만” 의미가 있고, TanStack Query는 “브라우저에서 사용자 경험을 개선하기 위해” 사용된다.
+
+---
+
+# Data Cache: `fetch` 응답을 서버에 저장
+
+Data Cache는 `fetch` 응답 자체를 서버 측에 저장하는 캐시다.
+
+Request Memoization이 하나의 렌더링 안에서만 유지된다면, Data Cache는 여러 사용자 요청 사이에서도 재사용될 수 있다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/28856a8b-c055-4191-95b5-87addeb2ebe4/image.png)
+
+Data Cache는 서버에서 공유될 수 있으므로 모든 사용자에게 동일하게 보여도 되는 데이터에 적합하다.
+
+좋은 예시는 다음과 같다.
+
+- 블로그 글 목록
+- 문서 페이지
+- 상품 카탈로그
+- 공지사항
+- 카테고리 목록
+- 지역 목록
+
+반대로 사용자마다 달라지는 데이터에는 조심해야 한다.
+
+- 내 프로필
+- 내 장바구니
+- 내 알림
+- 내 주문 내역
+- 권한에 따라 달라지는 데이터
+
+### 핵심 옵션 3가지
+
+실무에서는 캐싱 의도를 명시하는 편이 좋다.
+
+```tsx
+// 오래 캐시해도 되는 데이터
+fetch(url, { cache: 'force-cache' });
+
+// 항상 최신이어야 하는 데이터
+fetch(url, { cache: 'no-store' });
+
+// 60초마다 재검증해도 되는 데이터
+fetch(url, { next: { revalidate: 60 } });
+```
+
+각 옵션은 Pages Router의 렌더링 방식과 대략 이렇게 연결해서 이해할 수 있다.
+
+| App Router                 | 의미                      | Pages Router 감각 |
+| -------------------------- | ------------------------- | ----------------- |
+| `cache: 'no-store'`        | 매 요청마다 새로 가져오기 | SSR               |
+| `cache: 'force-cache'`     | 캐시 가능한 응답 재사용   | SSG               |
+| `next: { revalidate: 60 }` | 60초 단위로 재검증        | ISR               |
+
+하지만 App Router에서는 페이지 단위보다 **fetch 단위**로 생각하는 것이 중요하다.
+
+### 한 페이지 안에서 다른 캐싱 정책을 함께 쓸 수 있다
+
+예를 들어 도시 상세 페이지가 있다고 해보자.
+
+도시 소개는 하루 정도 캐시해도 된다. 하지만 내 북마크 여부는 사용자마다 다르고 최신이어야 한다.
+
+```tsx
+export default async function CityPage({ params }: { params: { cityId: string } }) {
+  const cityInfo = await fetch(`https://api.example.com/cities/${params.cityId}`, {
+    next: { revalidate: 86400 },
+  }).then((res) => res.json());
+
+  const myBookmark = await fetch(`https://api.example.com/me/bookmarks/${params.cityId}`, {
+    cache: 'no-store',
+  }).then((res) => res.json());
+
+  return <CityView cityInfo={cityInfo} myBookmark={myBookmark} />;
+}
+```
+
+이 페이지의 데이터 정책은 다음처럼 나뉜다.
+
+```txt
+도시 소개       → 24시간 캐시
+내 북마크 여부  → 캐시하지 않음
+```
+
+이것이 App Router 캐싱의 중요한 변화다.
+
+Pages Router에서는 “이 페이지는 SSR인가? SSG인가?”를 먼저 고민했다면, App Router에서는 “이 데이터는 얼마나 신선해야 하는가?”를 먼저 고민해야 한다.
+
+### 태그 기반 무효화
+
+시간 기반 재검증만으로는 부족할 때가 있다.
+
+예를 들어 게시글 목록을 1시간 캐시한다고 해보자. 관리자가 게시글을 수정했는데 사용자가 최대 1시간 동안 이전 목록을 보면 문제가 될 수 있다.
+
+이럴 때는 `tags`와 `revalidateTag()`를 사용한다.
+
+```tsx
+// 데이터 조회
+fetch('https://api.example.com/posts', {
+  next: { tags: ['posts'] },
+});
+```
+
+```tsx
+// 데이터 변경 후
+'use server';
+
+import { revalidateTag } from 'next/cache';
+
+export async function createPost() {
+  await db.post.create({ data: { title: 'New Post' } });
+  revalidateTag('posts', 'max');
+}
+```
+
+태그 기반 무효화는 전체 캐시를 날리는 것이 아니라, 특정 데이터 그룹만 재검증 대상으로 만든다.
+
+---
+
+# Full Route Cache: 페이지 렌더링 결과 저장
+
+Data Cache가 `fetch` 응답을 저장한다면, Full Route Cache는 페이지 렌더링 결과를 저장한다.
+
+여기서 렌더링 결과는 크게 두 가지다.
+
+1. HTML
+2. RSC Payload
+
+HTML은 브라우저가 초기 화면을 빠르게 보여주기 위해 받는 문서다.
+
+RSC Payload는 React Server Component의 렌더링 결과를 담은 데이터다. 쉽게 말하면 서버에서 렌더링된 컴포넌트 트리를 브라우저가 이어받을 수 있도록 직렬화한 결과다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/5101050e-6623-428b-a2cf-0c00c09a88db/image.png)
+
+정적으로 렌더링 가능한 페이지라면 Next.js는 이 결과를 서버에 저장하고 다음 요청에서 재사용할 수 있다.
+
+예를 들어 블로그 글 상세 페이지는 Full Route Cache에 잘 맞는다.
+
+```txt
+/blog/nextjs-cache
+→ 글 내용이 자주 바뀌지 않음
+→ 모든 사용자에게 같은 내용 표시
+→ HTML + RSC Payload 캐시 가능
+```
+
+반대로 마이페이지는 적합하지 않다.
+
+```txt
+/my-page
+→ 사용자마다 데이터가 다름
+→ 쿠키, 세션, 권한에 따라 결과가 달라짐
+→ 페이지 전체 결과를 공유하면 안 됨
+```
+
+### Data Cache와 Full Route Cache의 관계
+
+둘은 연결되어 있지만 같은 것은 아니다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/1fbc32de-265f-4121-ab35-576b993fa367/image.png)
+
+- Data Cache는 `fetch` 응답을 저장한다.
+- Full Route Cache는 그 데이터로 만든 페이지 결과를 저장한다.
+
+Data Cache가 재검증되면, 그 데이터를 사용하는 페이지 렌더링 결과도 다시 만들어져야 한다. 그래서 Data Cache의 변화는 Full Route Cache에도 영향을 준다.
+
+### `use client`가 있으면 Full Route Cache가 무조건 꺼질까?
+
+그렇지 않다.
+
+`use client`는 해당 컴포넌트가 브라우저에서 hydrate되어 상호작용할 수 있다는 뜻이다. 그것만으로 route 전체가 무조건 동적 렌더링되는 것은 아니다.
+
+정적인 페이지 안에 작은 Client Component가 있을 수 있다.
+
+```tsx
+export default function HomePage() {
+  return (
+    <main>
+      <h1>Welcome</h1>
+      <LikeButton />
+    </main>
+  );
+}
+```
+
+이 경우 `LikeButton`이 Client Component여도 페이지 자체는 정적으로 렌더링될 수 있다.
+
+Full Route Cache를 어렵게 만드는 것은 보통 다음 요소들이다.
+
+- `cache: 'no-store'`
+- `revalidate = 0`
+- `dynamic = 'force-dynamic'`
+- 요청 시점의 `cookies()`
+- 요청 시점의 `headers()`
+- 사용자마다 달라지는 데이터
+
+정리하면 “Client Component를 쓰면 캐시가 안 된다”가 아니라, **요청마다 달라지는 정보에 의존하면 Full Route Cache를 사용하기 어렵다**가 더 정확하다.
+
+---
+
+# Router Cache: 브라우저에서 페이지 이동을 빠르게 만든다
+
+Router Cache는 앞의 캐시들과 다르게 브라우저 메모리에 있다.
+
+Next.js App Router는 페이지 이동 시 전체 HTML 문서를 매번 새로 받지 않는다. 필요한 route segment의 RSC Payload를 받아 화면을 갱신한다. 그리고 방문했던 route나 `<Link>`로 prefetch한 route의 RSC Payload를 브라우저 메모리에 저장한다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/3e2a28aa-4967-4ca9-b3c1-de32830203ac/image.png)
+
+그래서 App Router의 페이지 이동은 빠르게 느껴진다.
+
+하지만 이 때문에 헷갈리는 상황도 생긴다.
+
+서버에서 `revalidateTag('posts')`를 호출했는데, 사용자의 브라우저가 이미 `/posts`의 RSC Payload를 Router Cache에 들고 있다면 이전 화면이 잠깐 보일 수 있다.
+
+```txt
+서버 Data Cache는 무효화됨
+하지만 브라우저 Router Cache에는 이전 RSC Payload가 남아 있음
+클라이언트 이동 시 서버 요청 없이 이전 Payload를 재사용할 수 있음
+```
+
+### `router.refresh()`는 무엇을 새로고침할까?
+
+`router.refresh()`는 현재 route의 Router Cache를 무효화하고 서버에 다시 요청한다.
+
+```tsx
+'use client';
+
+import { useRouter } from 'next/navigation';
+
+export function RefreshButton() {
+  const router = useRouter();
+
+  return <button onClick={() => router.refresh()}>새로고침</button>;
+}
+```
+
+중요한 점은 `router.refresh()`가 서버의 Data Cache나 Full Route Cache를 직접 삭제하지 않는다는 것이다.
+
+```txt
+router.refresh()
+→ 브라우저 Router Cache를 비움
+→ 현재 route를 서버에 다시 요청
+
+하지만 서버에 Data Cache가 살아있으면
+→ 서버는 캐시된 데이터를 다시 줄 수 있음
+```
+
+따라서 데이터 자체를 무효화해야 한다면 `revalidateTag()` 또는 `revalidatePath()`와 함께 생각해야 한다.
+
+---
+
+## `router.refresh`, `revalidateTag`, `revalidatePath` 차이
+
+세 API는 이름이 비슷해서 헷갈리지만, 무효화하는 대상이 다르다.
+
+| API                | 실행 위치                    | 주 대상                | 언제 쓰나                               |
+| ------------------ | ---------------------------- | ---------------------- | --------------------------------------- |
+| `router.refresh()` | Client Component             | Router Cache           | 현재 화면을 서버에서 다시 받고 싶을 때  |
+| `revalidateTag()`  | Server Action, Route Handler | 태그가 붙은 Data Cache | 특정 데이터 그룹을 무효화할 때          |
+| `revalidatePath()` | Server Action, Route Handler | 특정 path의 캐시       | 특정 페이지 또는 route를 다시 검증할 때 |
+
+핵심은 다음과 같다.
+
+```txt
+서버 데이터 캐시를 무효화하고 싶다 → revalidateTag / revalidatePath
+현재 브라우저 화면을 다시 받고 싶다 → router.refresh
+```
+
+---
+
+# Pages Router와 App Router 비교
+
+이전에도 언급했지만, Pages Router에서는 렌더링 전략을 페이지 함수로 표현했다.
+
+```tsx
+// Pages Router
+export async function getServerSideProps() {}
+export async function getStaticProps() {}
+```
+
+App Router에서는 `fetch` 옵션으로 데이터별 캐싱 정책을 표현한다.
+
+```tsx
+// App Router
+fetch(url, { cache: 'no-store' });
+fetch(url, { cache: 'force-cache' });
+fetch(url, { next: { revalidate: 60 } });
+```
+
+비교하면 다음과 같다.
+
+| Pages Router                   | App Router                     |
+| ------------------------------ | ------------------------------ |
+| 페이지 단위로 SSR/SSG/ISR 선택 | `fetch` 단위로 캐싱 정책 선택  |
+| `getServerSideProps`           | `cache: 'no-store'`            |
+| `getStaticProps`               | `cache: 'force-cache'`         |
+| `revalidate` 반환              | `next: { revalidate: number }` |
+
+물론 완전히 1:1로 대응되는 것은 아니지만, 기존 Pages Router 감각을 App Router로 옮길 때는 이렇게 이해하면 쉽다.
+
+중요한 변화는 이것이다.
+
+> App Router에서는 “이 페이지가 SSR인가?”보다 “이 데이터는 얼마나 최신이어야 하는가?”가 더 중요하다.
+
+---
+
+# 실무에서 캐싱 정책을 정하는 기준
+
+캐싱은 무조건 많이 한다고 좋은 것이 아니다. 기준은 데이터의 성격이다.
+
+### 1. 거의 바뀌지 않는 공통 데이터
+
+예시:
+
+- 블로그 글
+- 문서
+- 약관
+- 소개 페이지
+- 카테고리 목록
+
+추천:
+
+```tsx
+fetch(url, { cache: 'force-cache' });
+```
+
+또는 일정 주기로 재검증한다.
+
+```tsx
+fetch(url, { next: { revalidate: 86400 } });
+```
+
+### 2. 가끔 바뀌는 공통 데이터
+
+예시:
+
+- 게시글 목록
+- 상품 목록
+- 공지사항
+- 이벤트 배너
+
+추천:
+
+```tsx
+fetch(url, {
+  next: {
+    revalidate: 3600,
+    tags: ['posts'],
+  },
+});
+```
+
+데이터 변경 이벤트가 있다면 태그 기반 무효화도 함께 사용한다.
+
+```tsx
+revalidateTag('posts', 'max');
+```
+
+### 3. 사용자마다 달라지는 데이터
+
+예시:
+
+- 내 프로필
+- 내 장바구니
+- 내 알림
+- 내 주문 내역
+
+추천:
+
+```tsx
+fetch(url, { cache: 'no-store' });
+```
+
+또는 Client Component에서 TanStack Query, SWR 같은 클라이언트 데이터 패칭 도구를 사용할 수 있다.
+
+### 4. 항상 최신이어야 하는 데이터
+
+예시:
+
+- 결제 상태
+- 인증 상태
+- 권한 정보
+- 실시간 재고
+- 관리자 승인 상태
+
+추천:
+
+```tsx
+fetch(url, { cache: 'no-store' });
+```
+
+이런 데이터는 캐싱으로 얻는 성능보다 잘못된 데이터를 보여줄 위험이 더 크다.
+
+---
+
+## 자주 헷갈리는 상황별 정리
+
+| 상황                                               | 먼저 의심할 캐시              | 해결 방향                                             |
+| -------------------------------------------------- | ----------------------------- | ----------------------------------------------------- |
+| API 응답이 바뀌었는데 서버 렌더링 결과가 예전이다  | Data Cache                    | `revalidateTag`, `revalidatePath`, `no-store` 확인    |
+| 서버 캐시를 무효화했는데 브라우저 화면이 그대로다  | Router Cache                  | `router.refresh()` 또는 이동 방식 확인                |
+| 정적 페이지가 계속 예전 HTML을 보여준다            | Full Route Cache              | Data Cache 재검증, 재배포, dynamic 옵션 확인          |
+| 같은 API가 여러 컴포넌트에서 호출된다              | Request Memoization           | `fetch` 직접 사용 여부, `cache()` 적용 여부 확인      |
+| 사용자별 데이터가 다른 사용자에게 보일까 걱정된다  | Data Cache / Full Route Cache | `cache: 'no-store'`, cookies/headers 기반 처리 확인   |
+| Client Component를 썼는데 캐시가 깨졌는지 헷갈린다 | Full Route Cache              | `use client` 자체보다 요청 시점 데이터 의존 여부 확인 |
+
+---
+
+## 최종 요약
+
+Next.js 캐싱은 하나의 기능이 아니라 여러 레이어가 함께 동작하는 구조다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/a7226fd2-9d5c-4a97-950d-d15e0c687562/image.png)
+
+가장 중요한 구분은 다음이다.
+
+```txt
+Request Memoization은 렌더링 중복 실행을 줄인다.
+Data Cache는 서버에서 fetch 응답을 재사용한다.
+Full Route Cache는 서버에서 페이지 결과물을 재사용한다.
+Router Cache는 브라우저에서 페이지 이동을 빠르게 만든다.
+```
+
+Next.js 캐싱을 디버깅할 때는 “왜 안 바뀌지?”라고 생각하기보다 다음 질문을 던지는 것이 좋다.
+
+1. 지금 오래된 것은 데이터인가, 페이지 결과물인가, 브라우저의 RSC Payload인가?
+2. 이 데이터는 모든 사용자에게 공유해도 되는가?
+3. 얼마나 자주 바뀌는가?
+4. 얼마나 최신이어야 하는가?
+5. 서버 캐시를 무효화해야 하는가, 브라우저 Router Cache를 갱신해야 하는가?
+
+이 질문에 답할 수 있으면 캐싱 전략은 훨씬 명확해진다.
+
+결국 실무에서 중요한 것은 캐시 API를 많이 아는 것이 아니라, **데이터의 신선도와 공유 범위를 기준으로 적절한 캐시 레이어를 선택하는 것**이다.
+
+Next.js 캐싱은 처음에는 복잡해 보이지만, 레이어를 나누어 보면 꽤 일관적이다.
+
+```txt
+브라우저에서 빠르게 이동하기 위한 Router Cache
+서버에서 페이지 결과를 재사용하기 위한 Full Route Cache
+서버에서 데이터 응답을 재사용하기 위한 Data Cache
+렌더링 중복 실행을 막기 위한 Request Memoization
+```
+
+이 네 가지를 구분하는 순간, Next.js 캐싱은 더 이상 마법처럼 느껴지지 않는다. 이제는 문제가 생겼을 때 “어느 캐시를 무효화해야 하지?”라고 판단할 수 있다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/18cacea4-87a1-40f4-95e4-14e7fd2132ff/image.png)
+
+---
+
+## 참고 자료
+
+- Next.js 공식 문서 — Caching and Revalidating, Previous Model: https://nextjs.org/docs/app/guides/caching-without-cache-components
+- Next.js 공식 문서 — `fetch`: https://nextjs.org/docs/app/api-reference/functions/fetch
+- Next.js 공식 문서 — `revalidateTag`: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+- Next.js 공식 문서 — `revalidatePath`: https://nextjs.org/docs/app/api-reference/functions/revalidatePath
+- Next.js 공식 문서 — Caching in Next.js v14: https://nextjs.org/docs/14/app/building-your-application/caching
