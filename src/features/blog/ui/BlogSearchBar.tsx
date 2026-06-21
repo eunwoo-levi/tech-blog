@@ -6,6 +6,7 @@ import { FaSearch } from 'react-icons/fa';
 
 export default function BlogSearchBar() {
   const [searchTitle, setSearchTitle] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const router = useRouter();
 
@@ -13,6 +14,7 @@ export default function BlogSearchBar() {
     e.preventDefault();
     if (searchTitle.trim() === '') return;
 
+    setIsSearching(true);
     router.push(`/search?keyword=${encodeURIComponent(searchTitle.trim())}`);
   };
 
@@ -32,10 +34,15 @@ export default function BlogSearchBar() {
       />
       <button
         type='submit'
-        className='rounded-md p-1 text-gray-600 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-200'
+        disabled={isSearching}
+        className='rounded-md p-1 text-gray-600 transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed dark:text-gray-400 dark:hover:text-gray-200'
         aria-label='검색'
       >
-        <FaSearch size={20} />
+        {isSearching ? (
+          <div className='h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-gray-600 dark:border-t-gray-300' />
+        ) : (
+          <FaSearch size={20} />
+        )}
       </button>
     </form>
   );
