@@ -1,0 +1,414 @@
+---
+title: '[React] 프론트엔드 테스트 전략과 자동화'
+author: 'Eunwoo'
+thumbnail: '/thumbnail/reactjs.webp'
+publishDate: '2026-07-01'
+categoryId: 6
+keywords:
+  ['React', 'Frontend Test', 'Unit Test', 'Integration Test', 'E2E Test', 'Playwright', 'CI']
+description: '프론트엔드 테스트의 종류, 작성 전략, CI 기반 자동화, E2E 안정화, 면접 답변까지 정리합니다.'
+---
+
+프론트엔드 테스트는 단순히 버그를 찾기 위한 도구가 아니다. 사용자가 실제로 겪는 핵심 흐름을 보호하고, 리팩터링과 배포를 더 안전하게 만드는 기반이다.
+
+프론트엔드는 사용자와 가장 가까운 영역이다. 작은 코드 변경 하나가 로그인, 게시글 작성, 결제, 알림 같은 핵심 경험을 깨뜨릴 수 있다. 그래서 프론트엔드 테스트는 “코드가 예상대로 실행되는가”를 넘어 “변경 이후에도 사용자 흐름이 안전한가”를 확인해야 한다.
+
+# 테스트를 왜 하는가
+
+프론트엔드 테스트의 핵심 목적은 **회귀 버그를 빠르게 발견하고, 핵심 사용자 흐름을 안전하게 유지하는 것**이다.
+
+프론트엔드 테스트가 필요한 이유는 크게 네 가지다.
+
+- **회귀 버그 방지**: 기존에 잘 동작하던 기능이 새로운 변경으로 깨지는 것을 빠르게 발견한다.
+- **리팩터링 안정성 확보**: 내부 구현을 바꾸더라도 사용자 관점의 동작이 유지되는지 확인할 수 있다.
+- **릴리즈 안정성 향상**: 배포 전 CI에서 자동으로 테스트를 실행해 수동 QA 의존도를 낮춘다.
+- **팀 협업 효율 개선**: PR 단계에서 변경의 안정성을 객관적으로 확인할 수 있다.
+
+즉 명료하게 정리하자면 아래와 같이 정리할 수 있다.
+
+> 프론트엔드 테스트의 목적은 구현 세부사항을 검증하는 것이 아니라, 사용자가 실제로 겪는 핵심 흐름이 변경 이후에도 깨지지 않는지 빠르게 확인하는 것입니다. 그래서 단순 함수는 단위 테스트로, 여러 컴포넌트와 API 흐름은 통합 테스트로, 로그인이나 게시글 작성 같은 핵심 시나리오는 E2E 테스트로 자동화합니다.
+
+# 프론트엔드 테스트의 큰 그림
+
+프론트엔드 테스트는 하나의 방식으로 모든 문제를 해결하기 어렵다. 테스트마다 속도, 신뢰도, 유지보수 비용이 다르기 때문이다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/65fbfd9c-e7b9-485e-8d96-9b20c30f5641/image.png)
+
+프론트엔드 테스트는 보통 다음 계층으로 나눠 생각할 수 있다.
+
+| 구분             | 목적                                | 예시                            | 특징                                    |
+| ---------------- | ----------------------------------- | ------------------------------- | --------------------------------------- |
+| Static Test      | 실행 전 오류 방지                   | TypeScript, ESLint, Prettier    | 가장 빠르고 비용이 낮다                 |
+| Unit Test        | 작은 로직 검증                      | 유틸, 훅, reducer, store action | 빠르고 안정적이다                       |
+| Component Test   | 컴포넌트 동작 검증                  | 입력, 클릭, 조건부 렌더링       | 사용자 관점에 가깝다                    |
+| Integration Test | 컴포넌트, 상태, API 흐름 검증       | 검색, 목록, 에러 처리           | 프론트엔드에서 실용성이 크다            |
+| E2E Test         | 실제 브라우저 기반 사용자 흐름 검증 | 로그인, 작성, 결제              | 신뢰도는 높지만 느리고 불안정할 수 있다 |
+
+전통적인 테스트 피라미드는 unit test를 많이 두고 E2E test를 적게 두는 구조다. 하지만 프론트엔드에서는 UI, 상태, 서버 응답이 함께 얽히는 경우가 많기 때문에 **integration test의 가치가 크다**.
+
+좋은 전략은 다음과 같다.
+
+- TypeScript와 ESLint로 기본적인 오류를 빠르게 막는다.
+- 유틸, 훅, 상태 로직은 unit test로 검증한다.
+- 컴포넌트와 API 응답 흐름은 integration test로 검증한다.
+- 로그인, 게시글 작성, 결제 같은 핵심 시나리오는 E2E test로 보호한다.
+
+즉, 프론트엔드 테스트를 TypeScript와 ESLint 같은 정적 검증, 유틸과 훅 중심의 단위 테스트, 사용자 흐름 중심의 통합 테스트, 그리고 핵심 시나리오에 대한 E2E 테스트로 나눠서 봅니다. 모든 것을 E2E로 테스트하면 느리고 불안정해지기 때문에, 빠른 테스트와 실제 사용자 플로우 테스트의 균형을 맞추는 것이 중요하다고 생각한다.
+
+# 무엇을 어떻게 테스트할까
+
+모든 코드를 테스트하려고 하면 오히려 유지보수 비용이 커진다. 그래서 테스트는 **중요도와 변경 가능성**을 기준으로 우선순위를 정해야 한다.
+
+테스트 우선순위는 다음과 같이 잡을 수 있다.
+
+1. 깨지면 서비스에 큰 영향을 주는 기능
+2. 사용자가 자주 사용하는 핵심 플로우
+3. 과거에 버그가 자주 발생했던 부분
+4. 조건 분기가 많은 비즈니스 로직
+5. 리팩터링 예정인 코드
+
+## **Unit Test**
+
+unit test는 작은 함수, 유틸, 훅, 상태 로직처럼 독립적으로 검증 가능한 대상을 테스트한다.
+
+```ts
+export const formatPrice = (price: number) => {
+  return `${price.toLocaleString()}원`;
+};
+
+test('가격을 원화 형식으로 포맷한다', () => {
+  expect(formatPrice(10000)).toBe('10,000원');
+});
+```
+
+unit test는 빠르고 안정적이지만, 실제 사용자 흐름 전체를 보장하지는 못한다. 따라서 포맷팅, validation, reducer, store action처럼 작은 로직에 적합하다.
+
+## **Component Test**
+
+component test는 컴포넌트를 렌더링하고 사용자의 입력이나 클릭에 따라 화면이 바뀌는지 검증한다. React에서는 React Testing Library를 많이 사용한다.
+
+```tsx
+render(<LoginForm />);
+
+await user.type(screen.getByLabelText('이메일'), 'test@example.com');
+await user.type(screen.getByLabelText('비밀번호'), 'password123');
+await user.click(screen.getByRole('button', { name: '로그인' }));
+
+expect(await screen.findByText('로그인 성공')).toBeInTheDocument();
+```
+
+핵심은 내부 state나 className이 아니라 **사용자에게 보이는 결과**를 테스트하는 것이다.
+
+## **Integration Test**
+
+integration test는 컴포넌트, 상태 관리, API 응답, 비동기 UI가 함께 동작하는지 검증한다. 프론트엔드에서 가장 실용적인 테스트가 되는 경우가 많다.
+
+예를 들어 검색 기능이라면 다음 흐름을 검증할 수 있다.
+
+- 검색어 입력
+- API 요청 mocking
+- 로딩 UI 표시
+- 결과 리스트 렌더링
+- 빈 결과 처리
+- 에러 메시지 처리
+
+API mocking에는 MSW를 사용할 수 있다.
+
+```ts
+server.use(
+  http.get('/api/posts', () => {
+    return HttpResponse.json([{ id: 1, title: '첫 번째 게시글' }]);
+  }),
+);
+```
+
+fetch나 axios를 직접 mock하는 방식보다 네트워크 레벨에서 mock하는 방식이 실제 코드 흐름에 더 가깝다.
+
+## **E2E Test**
+
+E2E test는 실제 브라우저에서 사용자가 하는 것처럼 전체 플로우를 테스트한다. Playwright나 Cypress를 사용할 수 있다.
+
+```ts
+test('사용자는 게시글을 작성할 수 있다', async ({ page }) => {
+  await page.goto('/login');
+
+  await page.getByLabel('이메일').fill('test@example.com');
+  await page.getByLabel('비밀번호').fill('password123');
+  await page.getByRole('button', { name: '로그인' }).click();
+
+  await page.goto('/posts/new');
+  await page.getByLabel('제목').fill('테스트 게시글');
+  await page.getByLabel('내용').fill('본문입니다');
+  await page.getByRole('button', { name: '작성하기' }).click();
+
+  await expect(page.getByText('테스트 게시글')).toBeVisible();
+});
+```
+
+E2E test는 실제 사용자 경험에 가장 가깝지만 느리고 flaky할 수 있다. 따라서 모든 케이스를 E2E로 만들기보다는 로그인, 결제, 게시글 작성처럼 **깨지면 치명적인 핵심 플로우**에 집중하는 것이 좋다.
+
+# 좋은 테스트 코드를 작성하는 기준
+
+좋은 프론트엔드 테스트는 구현 세부사항보다 사용자의 행동과 결과를 검증한다.
+
+나쁜 테스트는 내부 구현에 강하게 의존한다.
+
+```ts
+expect(component.state.isOpen).toBe(true);
+```
+
+좋은 테스트는 사용자가 실제로 보는 결과를 검증한다.
+
+```ts
+await user.click(screen.getByRole('button', { name: '메뉴 열기' }));
+
+expect(screen.getByRole('navigation')).toBeInTheDocument();
+```
+
+## **접근성 기반 query 사용**
+
+React Testing Library에서는 가능하면 접근성 기반 query를 사용하는 것이 좋다.
+
+```ts
+screen.getByRole('button', { name: '로그인' });
+screen.getByLabelText('이메일');
+screen.getByPlaceholderText('검색어를 입력하세요');
+```
+
+`data-testid`는 접근성 query로 찾기 어렵거나 의미 있는 role이 없는 경우에만 보조적으로 사용하는 것이 좋다.
+
+## **비동기 UI 테스트**
+
+프론트엔드에는 API 요청, 로딩, 에러, debounce, animation 등 비동기 흐름이 많다. 이때 임의의 `setTimeout`으로 기다리는 방식은 flaky test를 만들기 쉽다.
+
+좋지 않은 방식은 다음과 같다.
+
+```ts
+setTimeout(() => {
+  expect(screen.getByText('완료')).toBeInTheDocument();
+}, 1000);
+```
+
+좋은 방식은 실제 화면 변화가 일어날 때까지 기다리는 것이다.
+
+```ts
+expect(screen.getByText('로딩 중')).toBeInTheDocument();
+expect(await screen.findByText('데이터 로딩 완료')).toBeInTheDocument();
+```
+
+## **Snapshot Test**
+
+snapshot test는 작은 presentational component에는 사용할 수 있지만, 큰 화면 전체를 스냅샷으로 검증하는 방식은 조심해야 한다. 의미 없는 변경에도 테스트가 깨지고, 스냅샷을 무심코 업데이트하면 검증 가치가 낮아질 수 있기 때문이다.
+
+## **Visual Regression Test**
+
+기능 테스트만으로는 레이아웃 깨짐을 잡기 어렵다. 디자인 시스템, 공통 컴포넌트, 핵심 랜딩 페이지는 Storybook, Chromatic, Percy, Playwright screenshot 등을 활용해 시각적 회귀 테스트를 적용할 수 있다.
+
+## **Performance Test**
+
+프론트엔드 성능도 자동화할 수 있다.
+
+- PR마다 bundle size 증가 확인
+- Lighthouse CI로 성능 점수 확인
+- LCP, CLS, INP 같은 Web Vitals 회귀 감지
+- Playwright trace로 느린 사용자 흐름 확인
+
+구현 세부사항에 과하게 의존하는 테스트를 피하려고 한다. 그런 테스트는 리팩터링만 해도 쉽게 깨지기 때문이다. 대신 사용자가 어떤 행동을 했을 때 어떤 결과를 보는지를 기준으로 테스트한다.
+
+# CI 기반 테스트 자동화
+
+테스트의 효과는 CI와 연결될 때 커진다. 로컬에서만 실행하는 테스트는 잊히기 쉽지만, CI에서 PR마다 실행되면 main branch에 문제가 들어가기 전에 막을 수 있다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/a55bf551-4c12-42f8-b65e-b090ffdd373d/image.png)
+
+일반적인 프론트엔드 CI 흐름은 다음과 같다.
+
+```txt
+PR 생성
+↓
+의존성 설치
+↓
+TypeScript type check
+↓
+ESLint / Prettier check
+↓
+Unit Test
+↓
+Integration Test
+↓
+E2E Test
+↓
+Coverage Report / Test Report
+↓
+통과 시 merge 가능
+```
+
+GitHub Actions 예시는 다음과 같다.
+
+```yml
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and integration tests
+        run: npm run test
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: E2E tests
+        run: npm run test:e2e
+```
+
+실무에서는 여기에 다음 설정을 추가하면 좋다.
+
+- 테스트 실패 시 merge block
+- coverage report 업로드
+- Playwright trace 저장
+- 실패 시 screenshot, video 저장
+- 테스트 병렬 실행
+- 변경 범위에 따른 테스트 분리 실행
+
+Playwright 설정 예시는 다음과 같다.
+
+```ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+});
+```
+
+테스트 자동화는 PR 단위로 동작하게 구성하는 것이 중요하다. 코드가 main branch에 들어가기 전에 type check, lint, unit, integration, E2E 테스트를 실행하고, 실패하면 merge를 막아 릴리즈 안정성을 높일 수 있다.
+
+# 실무에서 자주 마주치는 문제
+
+프론트엔드 테스트는 작성보다 유지보수가 더 중요하다. 특히 E2E test는 실제 브라우저와 데이터, 네트워크 상태에 영향을 받기 때문에 관리 기준이 필요하다.
+
+## **Flaky Test**
+
+flaky test는 동일한 코드인데 어떤 때는 통과하고 어떤 때는 실패하는 테스트다. 테스트 신뢰도를 크게 떨어뜨리기 때문에 빠르게 원인을 제거해야 한다.
+
+주요 원인은 다음과 같다.
+
+- 임의의 timeout 사용
+- 비동기 대기 미흡
+- 테스트 간 데이터 공유
+- 네트워크 상태 의존
+- animation이나 transition 영향
+- 테스트 실행 환경 차이
+
+해결 방법은 다음과 같다.
+
+- `sleep` 대신 명시적인 locator와 assertion 사용
+- 테스트 데이터를 독립적으로 생성
+- 테스트 순서 의존 제거
+- 필요한 경우 API mock 사용
+- 실패 시 trace, screenshot, video 확인
+- retry는 원인 제거 이후 보조적으로만 사용
+
+## **Coverage**
+
+coverage는 참고 지표일 뿐이다. 높은 coverage가 곧 좋은 테스트를 의미하지는 않는다.
+
+예를 들어 의미 없는 getter, 단순 렌더링, 외부 라이브러리 wrapper만 테스트해서 coverage를 높일 수도 있다. 중요한 것은 숫자보다 **핵심 사용자 흐름과 위험도가 높은 로직이 테스트로 보호되고 있는가**이다.
+
+다만 팀 차원에서는 최소 coverage threshold를 설정해 테스트가 급격히 줄어드는 것을 방지할 수 있다.
+
+## **TDD**
+
+TDD는 다음 순서로 진행된다.
+
+```txt
+Red: 실패하는 테스트 작성
+Green: 테스트를 통과하는 최소 구현
+Refactor: 동작을 유지하면서 코드 개선
+```
+
+모든 UI를 TDD로 작성하기는 어렵지만, validation, 계산 로직, 상태 전이, API 응답 처리처럼 요구사항이 명확한 부분에는 효과적이다.
+
+**무엇을 테스트하지 않을 것인가**
+
+테스트하지 않는 기준도 중요하다. 다음 대상은 과도하게 테스트하지 않는 것이 좋다.
+
+- 단순 스타일
+- className 존재 여부
+- 내부 state 값
+- 구현 세부사항
+- 너무 자주 바뀌는 문구
+- 외부 라이브러리 자체 동작
+
+flaky test는 테스트 신뢰도를 떨어뜨리기 때문에 단순히 retry만 늘리는 방식은 지양한다.
+먼저 비동기 대기 방식, 테스트 데이터 의존성, 환경 차이를 확인하고 원인을 제거한 뒤 retry는 보조적으로 사용한다.
+
+# 정리
+
+프론트엔드 테스트 면접에서는 도구 이름만 나열하는 것보다, **왜 그 테스트를 선택했고 어떻게 자동화했는지**를 말하는 것이 중요하다.
+
+**Q. 프론트엔드에서 테스트는 왜 필요한가요?**
+
+> 프론트엔드는 사용자와 직접 맞닿아 있고, 작은 변경도 로그인, 결제, 게시글 작성 같은 핵심 흐름에 영향을 줄 수 있습니다. 테스트는 이런 회귀 버그를 빠르게 발견하고, 리팩터링이나 배포를 더 자신 있게 할 수 있게 해줍니다. 특히 자동화된 테스트를 CI에 연결하면 PR 단계에서 문제를 조기에 발견할 수 있습니다.
+
+**Q. Unit Test와 E2E Test의 차이는 무엇인가요?**
+
+> Unit Test는 함수나 훅처럼 작은 단위를 빠르게 검증하는 테스트이고, E2E Test는 실제 브라우저에서 사용자의 전체 흐름을 검증하는 테스트입니다. Unit Test는 빠르고 안정적이지만 전체 UX를 보장하기 어렵고, E2E는 실제 사용자 경험에 가깝지만 느리고 flaky할 수 있습니다. 그래서 둘을 목적에 맞게 조합하는 것이 중요합니다.
+
+**Q. 모든 테스트를 E2E로 만들면 안 되나요?**
+
+> 모든 테스트를 E2E로 만들면 실행 시간이 길어지고, 데이터나 네트워크 상태에 따라 불안정해질 수 있습니다. 그래서 핵심 사용자 플로우만 E2E로 보호하고, 작은 로직은 unit test, 컴포넌트와 API 흐름은 integration test로 검증하는 것이 더 효율적입니다.
+
+**Q. React Testing Library의 장점은 무엇인가요?**
+
+> React Testing Library는 컴포넌트의 내부 구현보다 사용자가 실제로 보는 화면과 행동을 중심으로 테스트하게 해줍니다. 예를 들어 state 값이 바뀌었는지를 직접 확인하기보다, 버튼 클릭 후 모달이 보이는지를 확인합니다. 그래서 리팩터링에 덜 깨지고, 사용자 관점에 가까운 테스트를 작성할 수 있습니다.
+
+**Q. Mocking은 어떻게 하나요?**
+
+> API는 MSW를 사용해 네트워크 레벨에서 mocking하는 방식을 선호합니다. fetch나 axios 자체를 mock하면 실제 동작과 멀어질 수 있는데, MSW는 실제 요청 흐름과 비슷하게 성공, 실패, 지연 응답을 테스트할 수 있어서 더 현실적인 통합 테스트를 작성할 수 있습니다.
+
+**Q. 테스트 자동화는 어떻게 구성하나요?**
+
+> PR이 올라오면 CI에서 type check, lint, unit test, integration test, E2E test가 순서대로 실행되도록 구성합니다. 테스트가 실패하면 merge를 막아 main branch의 안정성을 유지하고, E2E 실패 시 screenshot이나 trace를 남겨 원인을 빠르게 파악할 수 있도록 합니다.
+
+**Q. Coverage는 어느 정도가 적절하다고 생각하나요?**
+
+> coverage는 참고 지표일 뿐이고, 높은 숫자가 좋은 테스트를 의미하지는 않습니다. 중요한 것은 핵심 사용자 흐름과 복잡한 비즈니스 로직이 테스트로 보호되고 있는지입니다. 다만 팀 차원에서 최소 coverage threshold를 설정해 테스트가 줄어드는 것은 방지할 수 있습니다.
+
+# 마무리
+
+프론트엔드 테스트를 사용자의 핵심 흐름을 안정적으로 보호하기 위한 장치라고 생각한다.
+작은 유틸이나 상태 로직은 unit test로 빠르게 검증하고, 컴포넌트와 API 응답이 함께 동작하는 흐름은 integration test로 확인하며, 로그인이나 게시글 작성 같은 중요한 사용자 시나리오는 Playwright 기반 E2E 테스트로 자동화한다.
+또한 CI에서 type check, lint, unit, E2E 테스트를 PR마다 실행해 merge 전에 회귀 버그를 발견할 수 있도록 구성했다.
+테스트는 단순히 버그를 찾는 수단이 아니라, 리팩터링과 빠른 배포를 가능하게 하는 기반이라고 생각한다.
+
+프론트엔드 테스트에서 가장 중요한 것은,
+테스트를 많이 작성하는 것보다, 깨지면 치명적인 사용자 흐름을 자동화해서 릴리즈 안정성을 높이는 것이 중요하다고 생각한다.
