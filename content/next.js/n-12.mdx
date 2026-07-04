@@ -1,0 +1,1100 @@
+---
+title: '[GraphQL] REST API 대신 GraphQL + Apollo Client를 사용하는 이유와 실무 도입기'
+author: 'Eunwoo'
+thumbnail: '/thumbnail/etc/graphql.webp'
+publishDate: '2026-07-05'
+categoryId: 6
+keywords: ['GraphQL', 'Apollo Client', 'React', 'Codegen', 'SSR', 'Cache', 'Frontend']
+description: '화면이 늘어날수록 REST API가 힘들어지는 이유부터, GraphQL과 Apollo Client를 도입하며 겪은 역할·문법·코드젠·캐시·인증·SSR 패턴까지 처음 보는 사람도 이해할 수 있게 정리합니다.'
+---
+
+회사에서 SSR로 렌더링되는 멀티테넌트 커뮤니티 플랫폼에서 GraphQL과 Apollo Client로 전환하며 겪은 경험을 정리한다.
+
+커뮤니티 서비스의 게시글 상세 화면을 만든다고 해보자. 화면 하나를 그리는 데 필요한 데이터만 나열해봐도 이 정도다.
+
+```txt
+- 게시글 제목, 본문
+- 작성자 닉네임, 프로필 이미지
+- 댓글 목록
+- 좋아요 여부, 좋아요 수
+- 현재 로그인한 내 정보
+```
+
+REST API로 시작하면 처음엔 편하다. `/posts/123`, `/posts/123/comments`, `/users/me`처럼 리소스마다 엔드포인트를 하나씩 열어주면 되니까. 문제는 서비스가 커지면서 시작된다.
+
+```txt
+- 화면이 늘어날 때마다 화면 전용 API를 새로 만들어야 한다.
+- 어떤 화면은 응답 필드의 절반도 안 쓰는데 전체를 다 받는다.
+- 화면 하나 그리려고 네트워크 요청을 서너 번씩 보낸다.
+- "이 필드 하나만 추가해주세요" 같은 요청 때문에 프론트와 백엔드가 계속 API 스펙을 맞춰야 한다.
+```
+
+새 화면을 만들 때마다 "이 화면엔 어떤 API가 필요하지?"를 백엔드와 매번 협의해야 하고, 비슷비슷한 API가 계속 늘어난다. 이 글은 이런 상황에서 REST 대신 GraphQL과 Apollo Client를 도입하며 정리한 내용이다. 핵심은 다음 한 가지였다.
+
+```txt
+화면마다 API를 새로 만들지 않고,
+클라이언트가 "이 화면엔 이 데이터가 필요해요"라고 직접 선언하게 하자.
+```
+
+두 방식을 그림으로 비교하면 이렇게 달라진다.
+
+```txt
+REST API
+  프론트엔드
+  → axios / fetch / TanStack Query
+  → /users/me, /posts, /comments 같은 REST API 호출
+  → 응답 데이터 사용
+
+GraphQL + Apollo
+  프론트엔드
+  → .gql 파일에 필요한 데이터 구조 작성
+  → codegen으로 React Hook과 TypeScript 타입 자동 생성
+  → Apollo Client가 GraphQL 서버에 요청
+  → Apollo Cache에 응답 저장
+  → React 컴포넌트에서 useXxxQuery(), useXxxMutation() 사용
+```
+
+GraphQL과 Apollo를 처음 접하는 사람도 따라올 수 있도록, REST와 비교하면서 개념 → 문법 → 실전 파이프라인 → 세팅 → 캐시 순서로 설명한다. 예시는 앞서 본 **커뮤니티 서비스**의 게시글 상세 화면을 기준으로 이어간다.
+
+---
+
+# REST API vs GraphQL 비교
+
+앞서 본 게시글 상세 화면을 REST와 GraphQL 두 가지 방식으로 만들어보면서, 화면이 늘어날수록 왜 GraphQL 쪽이 편해지는지 비교해본다.
+
+## REST API 방식
+
+REST API에서는 보통 리소스별 URL이 존재한다.
+
+```txt
+GET    /users/me
+GET    /posts?page=1
+GET    /posts/123
+GET    /posts/123/comments
+POST   /posts/123/likes
+DELETE /posts/123/likes
+```
+
+게시글 상세 화면 하나를 그리려면 이렇게 여러 요청이 필요할 수 있다.
+
+```txt
+GET /posts/123
+GET /posts/123/comments
+GET /users/me
+GET /posts/123/like-status
+```
+
+물론 백엔드가 화면 전용 API(`GET /post-detail-page/123`)를 만들어주면 한 번에 받을 수도 있다. 하지만 화면이 많아질수록 다음 문제가 생긴다.
+
+```txt
+- 화면마다 필요한 데이터가 조금씩 달라진다.
+- 기존 API 응답에 필요 없는 필드가 많아진다.
+- 새로운 화면을 만들 때마다 백엔드 API 추가가 필요해진다.
+- 여러 API를 조합하면 로딩, 에러, 캐시 관리가 복잡해진다.
+```
+
+## GraphQL 방식
+
+GraphQL은 URL을 여러 개 두기보다 하나의 엔드포인트(`POST /graphql`)를 쓴다. 대신 클라이언트가 요청 본문에 "내가 필요한 데이터 구조"를 직접 적는다.
+
+```graphql
+query PostDetailPage($postId: ID!) {
+  post(id: $postId) {
+    id
+    title
+    content
+    author {
+      id
+      nickname
+    }
+    likeInfo {
+      likedByMe
+      likeCount
+    }
+    comments {
+      id
+      content
+      author {
+        id
+        nickname
+      }
+    }
+  }
+  currentUser {
+    id
+    nickname
+  }
+}
+```
+
+이 요청은 "postId에 해당하는 게시글에서 id, title, content, author, likeInfo, comments만 주고, 로그인한 유저 정보도 같이 달라"는 뜻이다. 즉 GraphQL의 핵심은 다음이다.
+
+```txt
+서버가 정해둔 스키마 안에서,
+클라이언트가 필요한 필드만 선택해서 요청한다.
+```
+
+## REST 대신 GraphQL을 쓰는 이유
+
+**1. 필요한 데이터만 받을 수 있다.** REST 응답은 API마다 형태가 고정되어 있어서, 어떤 화면이 `id`, `title`, `author.nickname`만 필요해도 전체 응답을 다 받는다. GraphQL은 딱 그 필드만 요청한다.
+
+```graphql
+query PostCard($postId: ID!) {
+  post(id: $postId) {
+    id
+    title
+    author {
+      nickname
+    }
+  }
+}
+```
+
+불필요한 응답 필드가 줄고, 컴포넌트가 어떤 데이터를 쓰는지 코드에서 바로 보인다.
+
+**2. 여러 리소스를 한 번의 요청으로 가져올 수 있다.** `/posts/123`, `/posts/123/comments`, `/users/me`로 나뉘던 요청이 하나의 operation 안에 모인다.
+
+```graphql
+query PostPage($postId: ID!) {
+  post(id: $postId) {
+    id
+    title
+    comments {
+      id
+      content
+    }
+  }
+  currentUser {
+    id
+    nickname
+  }
+}
+```
+
+화면에 필요한 데이터 의존성이 한 곳에 모이는 셈이다.
+
+**3. 타입 기반 개발이 쉬워진다.** GraphQL 서버는 스키마를 갖고 있고, 이 스키마를 기반으로 TypeScript 타입을 자동 생성할 수 있다.
+
+```txt
+GraphQL Schema → .gql query/mutation → graphql-codegen → TypeScript 타입 + React Hook
+```
+
+응답 타입을 손으로 만들 필요가 줄고, 필드명이 틀리면 빌드 단계에서 잡히고, 백엔드 스키마 변경이 프론트 타입 에러로 드러난다.
+
+**4. 화면 기준으로 데이터를 선언할 수 있다.** REST는 "어떤 URL을 호출할지"가 중심이라면(`api.get('/posts/123')`), GraphQL은 "이 화면이 어떤 데이터를 필요로 하는지"가 중심이다. 즉 데이터 요구사항을 선언적으로 표현하기 좋다.
+
+## GraphQL의 단점
+
+GraphQL이 REST보다 항상 좋은 것은 아니다.
+
+| 항목          | REST API            | GraphQL                    |
+| ------------- | -------------------- | --------------------------- |
+| 진입장벽      | 낮음                 | 상대적으로 높음             |
+| API 구조      | URL 중심             | Schema 중심                 |
+| 응답 형태     | 서버가 고정          | 클라이언트가 선택           |
+| 캐싱          | HTTP 캐시와 잘 맞음  | 클라이언트 캐시 설계 필요   |
+| 타입 자동화   | 별도 도구 필요       | Codegen과 잘 맞음            |
+| 서버 구현     | 비교적 단순          | Resolver, Schema 설계 필요  |
+| 프론트 생산성 | API 설계에 의존      | 화면 기준 query 작성 가능   |
+
+schema, query, mutation, fragment, resolver, Apollo Cache, fetchPolicy, SSR hydration까지 알아야 할 개념이 늘어나므로 처음에는 REST보다 어렵게 느껴질 수 있다. 하지만 대규모 서비스, 여러 화면, 여러 도메인, 타입 안정성이 중요한 프론트엔드에서는 장점이 커진다.
+
+---
+
+# GraphQL과 Apollo Client 기본 개념
+
+GraphQL이 왜 REST보다 나은지 알았다면, 이제 실제 React 코드에서 어떻게 쓰는지 알아야 한다. 그 전에 가장 중요한 구분부터 짚는다.
+
+```txt
+GraphQL = API를 표현하는 언어이자 규격
+Apollo Client = React 앱에서 GraphQL을 쉽게 쓰게 해주는 클라이언트 라이브러리
+```
+
+## GraphQL의 역할
+
+GraphQL은 어떤 타입이 있는지, 어떤 query/mutation을 요청할 수 있는지, 각 필드가 무엇을 반환하는지를 정의한다.
+
+```graphql
+type Query {
+  post(id: ID!): Post
+  currentUser: User
+}
+
+type Mutation {
+  createComment(input: CreateCommentInput!): Comment!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  content: String!
+  author: User!
+  comments: [Comment!]!
+}
+```
+
+## Apollo Client의 역할
+
+Apollo Client는 프론트엔드에서 GraphQL 요청 전송, loading/error/data 상태 관리, 응답 캐싱과 정규화, mutation 후 캐시 갱신, 인증 헤더 추가, 401 처리, SSR 캐시 복원, React Hook 제공을 담당한다.
+
+```ts
+const { data, loading, error } = usePostDetailQuery({
+  variables: { postId },
+});
+```
+
+REST에서 `axios + TanStack Query`가 하던 일 중 상당 부분을, GraphQL 프로젝트에서는 Apollo Client가 담당한다고 보면 된다.
+
+## GraphQL 기본 문법
+
+### Query와 Mutation
+
+`query`는 읽기, `mutation`은 쓰기 operation이다.
+
+```graphql
+query CurrentUser {
+  currentUser {
+    id
+    nickname
+  }
+}
+
+mutation CreateComment($postId: ID!, $content: String!) {
+  createComment(postId: $postId, content: $content) {
+    id
+    content
+    createdAt
+  }
+}
+```
+
+주의할 점은 `query`가 HTTP GET이라는 뜻은 아니라는 것이다. GraphQL에서 `query`는 "읽기 작업"이라는 뜻일 뿐이고, 실제 HTTP 요청은 서버 설정에 따라 POST로 나갈 수도, persisted query로 최적화될 수도 있다.
+
+### Variables, Operation name, Field
+
+`$postId`처럼 `$`가 붙은 값은 변수다.
+
+```graphql
+query PostDetail($postId: ID!) {
+  post(id: $postId) {
+    id
+    title
+  }
+}
+```
+
+| 문법                | 의미                        |
+| ------------------- | --------------------------- |
+| `$postId`           | GraphQL 변수                |
+| `ID!`               | null이 될 수 없는 ID 타입   |
+| `post(id: $postId)` | post 필드에 id 인자를 전달  |
+
+프론트엔드에서는 `variables`로 값을 넘긴다.
+
+```ts
+usePostDetailQuery({ variables: { postId: '123' } });
+```
+
+`PostDetail`처럼 operation 앞에 붙는 이름은 **operation name**이다. 디버깅 시 Network 탭/Apollo DevTools에서 요청을 구분하는 용도로 쓰이고, codegen이 Hook 이름(`usePostDetailQuery`)을 만들 때도 이 이름을 사용한다.
+
+`post`, `id`, `title`, `author`, `nickname`처럼 선택하는 값은 **field**다. GraphQL 요청은 함수 호출처럼 보이지만, 정확히는 **스키마에 정의된 필드를 선택하는 것**이다.
+
+### Fragment
+
+Fragment는 여러 query에서 재사용하는 필드 묶음이다.
+
+```graphql
+fragment UserProfileFields on User {
+  id
+  nickname
+  profileImageUrl
+}
+
+query CurrentUser {
+  currentUser {
+    ...UserProfileFields
+  }
+}
+
+query PostDetail($postId: ID!) {
+  post(id: $postId) {
+    id
+    title
+    author {
+      ...UserProfileFields
+    }
+  }
+}
+```
+
+반복되는 필드 목록을 줄이고, 여러 화면에서 같은 User 필드 구조를 재사용할 수 있으며, codegen을 통해 fragment 타입도 함께 생성된다.
+
+### Alias와 Directive
+
+같은 필드를 다른 인자로 여러 번 조회해야 할 때는 **alias**를 쓴다.
+
+```graphql
+query ComparePosts {
+  firstPost: post(id: "1") {
+    id
+  }
+  secondPost: post(id: "2") {
+    id
+  }
+}
+```
+
+조건부로 필드를 포함/제외하고 싶을 때는 **directive**를 쓴다.
+
+```graphql
+query PostDetail($postId: ID!, $includeComments: Boolean!) {
+  post(id: $postId) {
+    id
+    comments @include(if: $includeComments) {
+      id
+    }
+  }
+}
+```
+
+`@include(if: 조건)`은 조건이 true일 때 포함, `@skip(if: 조건)`은 조건이 true일 때 제외한다. 둘 다 자주 쓰는 문법은 아니지만, 같은 필드를 이름만 바꿔 여러 번 조회하거나 조건부로 필드를 뺄 때 유용하다.
+
+## Resolver란 무엇인가?
+
+GraphQL query는 "무엇이 필요한지"만 말한다. 그 값을 실제로 어떻게 구할지 정의하는 함수가 **resolver**다.
+
+```ts
+const resolvers = {
+  Query: {
+    currentUser: async (_, __, context) => {
+      const userId = context.auth.userId;
+      return userRepository.findById(userId);
+    },
+  },
+};
+```
+
+```txt
+currentUser 필드 요청 → resolver 실행 → 로그인한 userId 확인 → DB 조회 → 응답 반환
+```
+
+resolver는 보통 백엔드 GraphQL 서버에 있지만, Apollo Client에도 클라이언트 전용 resolver를 둘 수 있다. 예를 들어 서버 스키마에 없는 `isBookmarkedLocally`를 프론트에서 계산하고 싶다면 이렇게 쓴다.
+
+```ts
+const resolvers = {
+  Post: {
+    isBookmarkedLocally: (post) => {
+      return localStorage.getItem(`bookmark:${post.id}`) === 'true';
+    },
+  },
+};
+```
+
+```graphql
+query PostCard($postId: ID!) {
+  post(id: $postId) {
+    id
+    isBookmarkedLocally @client
+  }
+}
+```
+
+| 종류                | 위치                     | 역할                                        |
+| ------------------- | ------------------------ | -------------------------------------------- |
+| 서버 resolver       | 백엔드 GraphQL 서버      | DB, 외부 API에서 데이터 조회                 |
+| 클라이언트 resolver | 프론트엔드 Apollo Client | 서버 스키마에 없는 값을 프론트에서 계산      |
+
+---
+
+# 실전 파이프라인: 스키마 fetch → Codegen → Apollo Client
+
+개념을 익혔으니, 이제 이 개념들이 실제 프로젝트에서 어떻게 세팅되고 이어지는지 볼 차례다. GraphQL 프론트 구축은 역할이 다른 3개 축으로 나뉜다.
+
+```txt
+① 스키마 확보    →  ② 코드 생성(codegen)  →  ③ 런타임 클라이언트
+  (rover)            (graphql-codegen)        (Apollo Client)
+```
+
+## 전제: 스키마는 누가 만드나
+
+먼저 확실히 할 것이 있다. **GraphQL 스키마(타입 정의)는 백엔드가 만든다.** 프론트는 그 스키마를 "받아서" 쓰는 쪽이다. 백엔드가 Apollo Studio(GraphOS) 같은 클라우드에 스키마를 등록해두면, 프론트는 그걸 내려받는다. 그래서 프론트 입장의 파이프라인은 다음과 같다.
+
+## 1. 패키지 설치
+
+```bash
+# 런타임: 실제 앱에서 쿼리 날리는 라이브러리
+npm i @apollo/client graphql
+
+# 빌드타임 도구 (devDependencies)
+npm i -D @apollo/rover
+npm i -D @graphql-codegen/cli @graphql-codegen/typescript \
+        @graphql-codegen/typescript-operations \
+        @graphql-codegen/typescript-react-apollo
+```
+
+`@apollo/client`가 ③ 런타임, `@apollo/rover`가 ① 스키마 확보, `@graphql-codegen/*`가 ② 코드 생성을 담당한다.
+
+## 2. 스키마 접근 정보 확보
+
+rover가 스키마를 내려받으려면 두 값이 필요하다. 이 값은 백엔드나 Apollo Studio 관리자에게 받는 것이지, 프론트가 만드는 게 아니다.
+
+```bash
+APOLLO_KEY=service:그래프이름:xxxxx      # 인증 키
+APOLLO_GRAPH_REF=그래프이름@current      # 어떤 그래프의 어떤 variant
+```
+
+## 3. 스키마 내려받기
+
+rover 명령 한 줄이면 백엔드의 전체 스키마를 파일로 저장할 수 있다.
+
+```bash
+rover graph fetch $APOLLO_GRAPH_REF --output src/graphql/scheme.graphql
+```
+
+환경 분기나 `.env` 로딩이 필요하면 `gqlgen.sh`처럼 셸 스크립트로 감싸고, 필요 없으면 `package.json`에 인라인으로 넣어도 된다.
+
+## 4. codegen 설정
+
+내려받은 스키마를 읽어서 **TS 타입 + React 훅을 자동 생성**하도록 설정한다.
+
+```js
+// codegen.cjs
+{
+  schema: ['src/graphql/scheme.graphql'],        // rover가 받은 스키마 (입력)
+  documents: ['src/**/*.{ts,tsx,graphql,gql}'],  // 내가 쓴 쿼리들 (입력)
+  generates: {
+    'src/graphql/typeGenerated.ts': { /* ... */ },  // 순수 타입 (출력)
+    'src/graphql/gqlGenerated.ts': { /* ... */ },   // useXxxQuery 훅들 (출력)
+  },
+}
+```
+
+## 5. 실행 명령 묶기
+
+스키마 fetch와 코드 생성을 한 명령으로 묶는다.
+
+```json
+"gqlgen": "sh gqlgen.sh && TS_NODE_PROJECT=tsconfig.codegen.json graphql-codegen --config codegen.cjs"
+```
+
+이제 `npm run gqlgen` 한 번이면 "최신 스키마 받기 → 타입/훅 생성"이 끝난다. 이후 `.gql` 쿼리를 작성하고 `useXxxQuery` 훅을 쓰는 방법은 [Codegen과 Query/Mutation Hook](#codegen과-querymutation-hook)에서, Apollo Client 런타임 구성은 [Apollo Client 세팅과 통신 계층](#apollo-client-세팅과-통신-계층)에서 이어서 다룬다.
+
+## 정리: 누가 만드는가
+
+| 단계           | 산출물                                   | 만드는 주체                          |
+| -------------- | ----------------------------------------- | ------------------------------------- |
+| 스키마 정의    | `scheme.graphql`                          | **백엔드** (프론트는 rover로 fetch만) |
+| rover CLI      | `rover` 명령                              | Apollo 제공 (설치만)                  |
+| fetch 스크립트 | `gqlgen.sh`                               | **프론트 개발자 작성**                |
+| codegen 설정   | `codegen.cjs`                             | **프론트 개발자 작성**                |
+| 타입/훅        | `typeGenerated.ts`, `gqlGenerated.ts`     | codegen 자동 생성 (직접 수정 X)       |
+| 쿼리           | `*.graphql`                               | **프론트 개발자 작성**                |
+| 런타임 설정    | `src/apollo/*`                            | **프론트 개발자 작성**                |
+
+한 문장으로 요약하면: 백엔드가 만든 스키마를 rover로 내려받고, codegen이 그 스키마와 내 쿼리를 읽어 타입·훅을 자동 생성하고, Apollo Client가 그 훅으로 실제 통신을 담당한다 — 이 셋을 `npm run gqlgen` + `src/apollo/` 설정으로 엮는 것이 전부다.
+
+---
+
+# Apollo Client 세팅과 통신 계층
+
+이제 실제로 프로젝트에 Apollo Client를 설치하고 세팅할 차례다. React 앱에서 Apollo를 쓰려면 보통 다음이 필요하다.
+
+```txt
+1. ApolloClient 생성
+2. HttpLink 생성
+3. InMemoryCache 생성
+4. ApolloProvider로 React 앱 감싸기
+```
+
+## ApolloClient 생성과 Provider 주입
+
+```ts
+import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+
+export const apolloClient = new ApolloClient({
+  link: new HttpLink({
+    uri: `${API_BASE_URL}/graphql`,
+    credentials: 'include',
+  }),
+  cache: new InMemoryCache(),
+});
+```
+
+| 코드            | 역할                                      |
+| --------------- | ------------------------------------------ |
+| `ApolloClient`  | GraphQL 요청과 캐시를 관리하는 핵심 객체   |
+| `HttpLink`      | 실제 GraphQL HTTP 요청을 보내는 Link       |
+| `InMemoryCache` | GraphQL 응답을 메모리에 정규화해서 저장    |
+
+React에서 Apollo Hook을 쓰려면 컴포넌트 트리 상단에 `ApolloProvider`가 있어야 한다.
+
+```tsx
+import { ApolloProvider } from '@apollo/client';
+import { apolloClient } from './apolloClient';
+
+export function App() {
+  return (
+    <ApolloProvider client={apolloClient}>
+      <Router />
+    </ApolloProvider>
+  );
+}
+```
+
+## Apollo Link 체인
+
+Apollo Link는 GraphQL 요청이 서버로 가기 전에 거치는 미들웨어 체인이다. 실무에서는 `HttpLink` 하나만 쓰기보다 여러 Link를 조합한다.
+
+```txt
+authLink → localeLink → errorLink → persistedQueryLink → httpLink
+```
+
+**인증 헤더 추가**는 모든 요청에 Authorization 헤더를 붙인다.
+
+```ts
+import { setContext } from '@apollo/client/link/context';
+
+const authLink = setContext((_, { headers }) => {
+  const accessToken = localStorage.getItem('accessToken');
+  return {
+    headers: {
+      ...headers,
+      authorization: accessToken ? `Bearer ${accessToken}` : '',
+    },
+  };
+});
+```
+
+**로케일 헤더 추가**는 다국어 서비스에서 현재 URL이나 앱 설정의 locale을 헤더에 싣는다.
+
+```ts
+const localeLink = setContext((_, { headers }) => {
+  const locale = getCurrentLocaleFromPathname();
+  return {
+    headers: { ...headers, 'x-translation-lang': locale },
+  };
+});
+```
+
+**401 에러 처리**는 토큰 만료 시 refresh token을 요청하고 기존 요청을 재시도한다.
+
+```ts
+import { onError } from '@apollo/client/link/error';
+
+const errorLink = onError(({ graphQLErrors, operation, forward }) => {
+  const unauthenticated = graphQLErrors?.some(
+    (error) => error.extensions?.code === 'UNAUTHENTICATED',
+  );
+  if (!unauthenticated) return;
+
+  return refreshToken().then((newAccessToken) => {
+    operation.setContext(({ headers = {} }) => ({
+      headers: { ...headers, authorization: `Bearer ${newAccessToken}` },
+    }));
+    return forward(operation);
+  });
+});
+```
+
+실무에서는 동시에 여러 요청이 401을 받을 수 있으므로, refresh token 요청이 중복 발생하지 않도록 큐를 둔다.
+
+```txt
+요청 A, B, C가 동시에 401 발생
+  → A만 refresh token 요청 실행, B/C는 대기
+  → 토큰 갱신 완료 → A, B, C 모두 새 토큰으로 재요청
+```
+
+**Link 조합**은 배열 순서대로 요청이 통과한다.
+
+```ts
+import { ApolloLink, HttpLink } from '@apollo/client';
+
+const httpLink = new HttpLink({ uri: `${API_BASE_URL}/graphql` });
+const link = ApolloLink.from([authLink, localeLink, errorLink, httpLink]);
+
+export const apolloClient = new ApolloClient({ link, cache: new InMemoryCache() });
+```
+
+## Persisted Query
+
+GraphQL 요청은 쿼리 문자열이 길어질 수 있다. Persisted Query는 전체 쿼리 문자열 대신 hash/id만 보내는 방식으로, 네트워크 전송량을 줄이고 서버에 등록된 operation만 허용하는 safelist 전략도 가능하게 한다. 단, 클라이언트와 서버가 모두 이 방식을 지원해야 한다.
+
+Apollo는 이를 라이브러리 레벨에서 지원하는 **Automatic Persisted Queries(APQ)** 를 제공한다. 클라이언트는 Link 체인에 `createPersistedQueryLink`만 추가하면 된다.
+
+```ts
+import { createPersistedQueryLink } from '@apollo/client/link/persisted-queries';
+import { sha256 } from 'crypto-hash';
+
+const persistedQueryLink = createPersistedQueryLink({ sha256 });
+```
+
+동작 흐름은 다음과 같다.
+
+```txt
+1. 클라이언트가 query 해시만 서버로 전송
+2. 서버가 해시를 모르면 PersistedQueryNotFound 에러 반환
+3. 클라이언트가 전체 query + 해시를 함께 재전송, 서버가 매핑을 저장
+4. 이후 요청부터는 해시만 보내도 서버가 매핑된 query를 찾아 실행
+```
+
+Apollo Server라면 APQ가 기본 활성화되어 있어 서버 설정이 거의 필요 없다. 반면 직접 구현한 GraphQL 서버라면 해시-쿼리 매핑을 저장/조회하는 로직을 서버 쪽에서 구현해야 한다.
+
+---
+
+# Codegen과 Query/Mutation Hook
+
+세팅이 끝났으니 이제 화면을 만들 차례다. 실무에서는 `.gql` 파일을 직접 import해서 `useQuery`에 넣기보다, codegen으로 자동 생성된 Hook을 사용한다.
+
+## .gql 작성부터 Hook 사용까지
+
+```graphql
+fragment PostCard_post on Post {
+  id
+  title
+  contentPreview
+  author {
+    id
+    nickname
+  }
+  likeInfo {
+    likedByMe
+    likeCount
+  }
+}
+
+query PostList($boardSlug: String!, $page: Int!) {
+  board(slug: $boardSlug) {
+    id
+    name
+    posts(page: $page) {
+      ...PostCard_post
+    }
+  }
+}
+```
+
+```bash
+npm run gqlgen
+```
+
+`src/graphql/gqlGenerated.ts`, `src/graphql/typeGenerated.ts`가 갱신되고, operation name `PostList`에 맞춰 `usePostListQuery` 훅이 생성된다. 프로젝트 컨벤션에 따라 operation name에 `gqlPostList`처럼 접두사를 쓰면 `useGqlPostListQuery`로 생성된다.
+
+```tsx
+import { usePostListQuery } from '@/graphql/gqlGenerated';
+
+export function PostListPage() {
+  const { data, loading, error } = usePostListQuery({
+    variables: { boardSlug: 'free-board', page: 1 },
+  });
+
+  if (loading) return <div>로딩 중...</div>;
+  if (error) return <div>에러가 발생했습니다.</div>;
+
+  return (
+    <ul>
+      {data?.board?.posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Query Hook 사용법
+
+기본 사용은 `variables`를 넘기고 `data`, `loading`, `error`, `refetch`, `networkStatus`를 돌려받는다.
+
+```ts
+const { data, loading, error } = usePostDetailQuery({
+  variables: { postId: '123' },
+});
+```
+
+필수 값이 없을 때 요청을 막고 싶으면 `skip`을 쓴다.
+
+```ts
+const { data } = useUserPostsQuery({
+  variables: { userId: user?.id, page: 1 },
+  skip: !user?.id,
+});
+```
+
+Apollo Client는 기본적으로 `cache-first` 전략을 쓴다. 자주 쓰는 `fetchPolicy`는 다음과 같다.
+
+| fetchPolicy         | 설명                                            | 사용 예시                    |
+| ------------------- | ------------------------------------------------ | ----------------------------- |
+| `cache-first`       | 캐시에 있으면 캐시 사용, 없으면 네트워크 요청    | 일반 상세 조회                |
+| `network-only`      | 항상 네트워크 요청                               | 최신성이 중요한 데이터        |
+| `cache-and-network` | 캐시를 먼저 보여주고 동시에 네트워크 요청        | 빠른 표시 + 최신화            |
+| `no-cache`          | 응답을 캐시에 저장하지 않음                      | 일회성 요청                   |
+| `cache-only`        | 캐시만 읽음                                      | 이미 캐시에 있다고 확신할 때  |
+
+`onCompleted`, `onError` 콜백도 쓸 수 있지만, 비즈니스 로직을 여기 너무 많이 넣으면 컴포넌트 흐름이 복잡해질 수 있다.
+
+## Mutation Hook 사용법
+
+Mutation Hook은 배열을 반환한다.
+
+```tsx
+import { useCreateCommentMutation } from '@/graphql/gqlGenerated';
+
+export function CommentForm({ postId }: { postId: string }) {
+  const [createComment, { loading }] = useCreateCommentMutation();
+
+  const handleSubmit = async (content: string) => {
+    await createComment({ variables: { postId, input: { content } } });
+  };
+
+  return (
+    <button disabled={loading} onClick={() => handleSubmit('댓글 내용')}>
+      댓글 작성
+    </button>
+  );
+}
+```
+
+mutation 후 UI를 최신화하는 방법은 크게 세 가지다.
+
+| 상황                        | 추천                 |
+| --------------------------- | --------------------- |
+| 단순하고 안정성이 중요      | `refetchQueries`       |
+| 네트워크 비용을 줄이고 싶음 | `cache.modify`         |
+| 즉시 반응해야 하는 UI       | `optimisticResponse`   |
+
+**refetchQueries**는 지정한 query를 mutation 성공 후 다시 요청한다. 구현이 단순하지만 네트워크 요청이 다시 발생한다.
+
+```ts
+await createComment({
+  variables: { postId, input: { content } },
+  refetchQueries: ['PostComments'],
+});
+```
+
+**cache.modify**는 네트워크 재요청 없이 Apollo Cache를 직접 수정한다. 빠르지만 Apollo Cache 구조를 이해해야 해서 처음엔 어렵다.
+
+```ts
+await createComment({
+  variables: { postId, input: { content } },
+  update: (cache, { data }) => {
+    const newComment = data?.createComment;
+    if (!newComment) return;
+
+    cache.modify({
+      id: cache.identify({ __typename: 'Post', id: postId }),
+      fields: {
+        comments(existingComments = []) {
+          const newRef = cache.writeFragment({
+            data: newComment,
+            fragment: gql`
+              fragment NewComment on Comment {
+                id
+                content
+                author {
+                  id
+                  nickname
+                }
+              }
+            `,
+          });
+          return [...existingComments, newRef];
+        },
+      },
+    });
+  },
+});
+```
+
+처음에는 `refetchQueries`로 안정적으로 처리하고, 성능이나 UX가 필요할 때 `cache.modify`를 검토하는 편이 좋다.
+
+**optimisticResponse**는 좋아요 버튼처럼 즉시 반응해야 하는 UI에 쓴다. 서버 응답을 기다리지 않고 UI를 먼저 바꾸고, 실패하면 롤백한다.
+
+```ts
+await likePost({
+  variables: { postId },
+  optimisticResponse: {
+    likePost: {
+      __typename: 'PostLikeInfo',
+      postId,
+      likedByMe: true,
+      likeCount: currentLikeCount + 1,
+    },
+  },
+});
+```
+
+---
+
+# Apollo Cache와 SSR
+
+Apollo Client의 큰 특징은 normalized cache다. GraphQL 응답이 중첩되어 있어도 Apollo는 객체를 `__typename + id` 기준으로 나누어 저장한다.
+
+```json
+{
+  "post": {
+    "__typename": "Post",
+    "id": "1",
+    "title": "GraphQL 시작하기",
+    "author": { "__typename": "User", "id": "10", "nickname": "eunwoo" }
+  }
+}
+```
+
+```txt
+Post:1    { id: 1, title: ..., author: User:10 }
+User:10   { id: 10, nickname: eunwoo }
+```
+
+같은 User가 여러 query에 등장해도 하나의 객체로 관리되고, mutation으로 특정 객체가 변경되면 관련 UI가 함께 갱신되며, 이미 캐시에 있는 데이터는 네트워크 요청 없이 바로 보여줄 수 있다.
+
+## 캐싱 여부를 결정하는 요소
+
+기본 fetchPolicy인 `cache-first`라면 첫 요청은 네트워크로, 같은 query와 variables로 조회하는 이후 요청은 캐시에서 반환된다. 다만 `network-only`나 `no-cache`를 쓰면 매번 네트워크 요청이 발생하므로, `InMemoryCache`를 쓴다고 항상 캐시가 재사용되는 것은 아니다.
+
+```txt
+GraphQL 캐싱 여부를 결정하는 요소
+- InMemoryCache 사용 여부
+- fetchPolicy (cache-first / network-only / no-cache 등)
+- query와 variables가 동일한지
+- 객체의 id, __typename 기반 정규화 정책
+```
+
+같은 query라도 variables가 다르면 별도의 캐시 항목으로 취급되고, 반대로 서로 다른 query라도 같은 `__typename + id`를 요청하면 캐시를 공유한다.
+
+## Pagination 처리
+
+게시글 목록처럼 페이지네이션이 있는 데이터는 캐시 병합 전략이 필요하다.
+
+```ts
+const cache = new InMemoryCache({
+  typePolicies: {
+    Query: {
+      fields: {
+        posts: {
+          keyArgs: false,
+          merge(existing = [], incoming) {
+            return [...existing, ...incoming];
+          },
+        },
+      },
+    },
+  },
+});
+```
+
+1페이지, 2페이지, 3페이지의 `posts`가 하나의 목록으로 병합된다. 실제 서비스에서는 중복 제거, 정렬, cursor 기반 pagination 여부도 함께 고려해야 한다.
+
+## SSR에서 Apollo 사용하기
+
+서버에서 이미 데이터를 가져와 HTML을 만들었는데 클라이언트에서 같은 GraphQL 요청을 다시 보내면 비효율적이다. 이를 막기 위해 서버의 Apollo Cache를 클라이언트로 전달한다.
+
+```txt
+서버에서 query 실행 → Apollo Cache 추출 → HTML props에 포함
+  → 클라이언트 Apollo Cache에 restore → useXxxQuery()가 캐시에서 바로 읽음
+```
+
+```ts
+// 서버
+const apolloClient = createApolloClient({ cookies, locale });
+const { data } = await apolloClient.query({
+  query: PostDetailDocument,
+  variables: { postId: params.postId },
+});
+const initialApolloState = apolloClient.extract();
+
+// 클라이언트
+const client = createApolloClient();
+client.cache.restore(initialApolloState);
+```
+
+Astro에서 React 컴포넌트를 island로 올릴 때는 ApolloProvider가 포함된 wrapper를 등록한다.
+
+```tsx
+export function ApolloWrapper({ children, initialApolloState }) {
+  const clientRef = useRef<ApolloClient<unknown> | null>(null);
+  if (!clientRef.current) {
+    clientRef.current = createApolloClient({ initialApolloState });
+  }
+  return <ApolloProvider client={clientRef.current}>{children}</ApolloProvider>;
+}
+
+export function withApollo(Component) {
+  return function ApolloComponent(props) {
+    return (
+      <ApolloWrapper initialApolloState={props.initialApolloState}>
+        <Component {...props} />
+      </ApolloWrapper>
+    );
+  };
+}
+```
+
+```astro
+---
+import ApolloPostListTab from '../components/ApolloPostListTab'
+---
+
+<ApolloPostListTab client:load initialApolloState={initialApolloState} />
+```
+
+## 서버와 클라이언트에서 Apollo Client를 다르게 만드는 이유
+
+SSR 환경에서는 서버가 요청마다 새 Apollo Client를 만들고, 브라우저는 하나의 인스턴스를 싱글턴으로 재사용해야 한다.
+
+```txt
+서버   → 요청마다 새 Apollo Client 생성
+브라우저 → 하나의 Apollo Client를 싱글턴으로 재사용
+```
+
+서버에서 Apollo Client를 전역 싱글턴으로 만들면 사용자 A의 캐시가 사용자 B에게 섞일 수 있다.
+
+```txt
+사용자 A 요청 → currentUser = A → Apollo Cache 저장
+사용자 B 요청 → 같은 서버 Apollo Client 재사용 → currentUser = A가 남아 있을 위험
+```
+
+그래서 서버에서는 요청마다 새 인스턴스를 만들어야 하고, 브라우저에서는 한 사용자의 앱 안에서만 동작하므로 싱글턴으로 재사용해도 된다.
+
+---
+
+# 실무 적용 가이드
+
+여기까지가 GraphQL과 Apollo Client의 핵심 개념이다. 마지막으로 실제 프로젝트에 적용할 때 참고할 파일 구조, 새 API 추가 흐름, 주의할 점을 정리한다.
+
+## 파일 구조
+
+실무 프로젝트에서는 도메인별로 `.gql` 파일을 나누는 경우가 많다.
+
+```txt
+src/graphql/
+├── schema.graphql
+├── gqlGenerated.ts
+├── typeGenerated.ts
+└── gql/
+    ├── user/
+    │   ├── currentUser.gql
+    │   └── userProfile.gql
+    ├── post/
+    │   ├── postList.gql
+    │   ├── postDetail.gql
+    │   └── mutation/
+    │       ├── createPost.gql
+    │       └── likePost.gql
+    └── comment/
+        ├── postComments.gql
+        └── mutation/
+            └── createComment.gql
+```
+
+| 파일/폴더          | 역할                                     |
+| ------------------- | ----------------------------------------- |
+| `schema.graphql`   | 서버 GraphQL 스키마                       |
+| `gqlGenerated.ts`  | 자동 생성된 React Hook                    |
+| `typeGenerated.ts` | 자동 생성된 TypeScript 타입               |
+| `gql/`             | 직접 작성하는 query, mutation, fragment   |
+| `mutation/`        | 데이터를 변경하는 operation 분리          |
+
+## 새 API를 추가하는 실무 흐름
+
+새 게시글 목록 API를 추가한다고 가정하면 흐름은 다음과 같다.
+
+```txt
+1. 화면에 필요한 데이터 정하기 (id, title, author.nickname, likeCount, likedByMe ...)
+2. .gql 파일 작성 (fragment + query)
+3. npm run gqlgen 실행 → usePostListQuery 등 자동 생성
+4. 필요하면 커스텀 훅으로 한 번 감싸기
+5. 컴포넌트에서 사용
+```
+
+3번까지는 앞서 [Codegen과 Query/Mutation Hook](#codegen과-querymutation-hook)에서 본 것과 동일하다. 4~5번은 이렇게 이어진다.
+
+```ts
+import { usePostListQuery } from '@/graphql/gqlGenerated';
+
+export function useBoardPosts(boardSlug?: string) {
+  return usePostListQuery({
+    variables: { boardSlug: boardSlug ?? '', page: 1 },
+    skip: !boardSlug,
+    fetchPolicy: 'cache-and-network',
+  });
+}
+```
+
+```tsx
+export function BoardPage({ boardSlug }: { boardSlug: string }) {
+  const { data, loading, error } = useBoardPosts(boardSlug);
+
+  if (loading) return <div>로딩 중...</div>;
+  if (error) return <div>게시글을 불러오지 못했습니다.</div>;
+
+  return (
+    <ul>
+      {data?.board?.posts.map((post) => (
+        <li key={post.id}>
+          <strong>{post.title}</strong>
+          <span>{post.author.nickname}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+화면 전용 훅으로 한 번 감싸두면, 컴포넌트는 GraphQL을 직접 알 필요 없이 필요한 데이터만 받아 쓸 수 있다.
+
+## 주의할 점
+
+**query가 너무 커지지 않게 하기.** 필요한 데이터를 한 번에 가져올 수 있다고 해서 모든 데이터를 한 query에 몰아넣으면 오히려 복잡해진다. 화면에서 실제로 쓰는 필드만 요청하고, 반복되는 필드는 fragment로 분리하고, 너무 큰 화면은 query를 적절히 나눈다.
+
+**fragment를 남용하지 않기.** `UserProfileFields`, `PostCardFields`처럼 이름만 보고 용도가 드러나는 fragment는 좋지만, `EverythingUserFields`, `FullPostFields`처럼 너무 많은 필드를 뭉쳐두면 어떤 필드를 요청하는지 추적하기 어려워진다.
+
+**mutation 후 캐시 갱신 전략을 미리 정하기.** 단순하고 안정성이 중요하면 `refetchQueries`, 네트워크 비용을 줄이고 싶으면 `cache.modify`, 즉시 반응해야 하는 UI는 `optimisticResponse` — 이 기준을 팀 컨벤션으로 미리 정해두면 mutation마다 매번 고민하지 않아도 된다.
+
+**서버 스키마 변경에 민감해지기.** GraphQL은 스키마 기반이므로 백엔드 스키마가 바뀌면 프론트 codegen 결과도 바뀐다.
+
+```txt
+서버 스키마 변경 → gqlgen 실행 → TypeScript 에러 확인 → 깨진 query/타입 수정
+```
+
+스키마 변경이 있을 때는 codegen을 다시 돌리고 타입 에러를 확인하는 습관이 필요하다.
+
+---
+
+# 전체 흐름 요약
+
+```txt
+개발자가 .gql 파일 작성
+  ↓
+npm run gqlgen 실행 (rover로 스키마 fetch → codegen 실행)
+  ↓
+gqlGenerated.ts에 useXxxQuery / useXxxMutation 생성
+  ↓
+React 컴포넌트에서 자동 생성 Hook 사용
+  ↓
+Apollo Client가 요청 처리 (Apollo Link 체인 통과)
+  ↓
+GraphQL 서버에 요청 → 서버 resolver가 실제 데이터 조회 → 응답 반환
+  ↓
+Apollo InMemoryCache에 저장
+  ↓
+React 컴포넌트가 data / loading / error로 화면 렌더링
+```
+
+# 마무리
+
+처음에 겪었던 문제로 돌아가보자. 화면이 늘어날 때마다 화면 전용 API를 새로 만들고, 안 쓰는 필드까지 받아오고, 프론트와 백엔드가 API 스펙을 계속 맞춰야 했던 문제. GraphQL과 Apollo Client는 이 문제를 "클라이언트가 필요한 데이터를 직접 선언한다"는 한 가지 원칙으로 풀어낸다.
+
+```txt
+GraphQL은 클라이언트가 필요한 데이터 구조를 선언하는 API 언어이고,
+Apollo Client는 React에서 그 GraphQL 요청을 보내고 캐싱하고 상태로 연결해주는 도구다.
+```
+
+REST API에서는 "어떤 URL을 호출할까?"가 중심이었다면, GraphQL + Apollo에서는 "이 화면에 어떤 데이터가 필요한가?"를 `.gql`로 선언하고, 자동 생성된 Hook으로 사용하는 흐름이 중심이다. 처음에는 문법이 많아 보이지만, 실무 흐름은 결국 다음 네 단계다.
+
+```txt
+1. .gql 작성
+2. gqlgen 실행 (스키마 fetch + codegen)
+3. useXxxQuery / useXxxMutation 사용
+4. Apollo Cache와 refetch 전략 관리
+```
+
+이 흐름만 잡으면 팀 프로젝트의 GraphQL 코드도 훨씬 빠르게 읽을 수 있다.
