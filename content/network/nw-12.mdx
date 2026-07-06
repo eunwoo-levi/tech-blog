@@ -407,6 +407,83 @@ Origin 서버가 인증을 위해 `Authorization` 헤더를 필요로 한다면 
 
 이처럼 Cache Policy와 Origin Request Policy를 분리해서 이해해야 안전한 CloudFront 설정을 만들 수 있다.
 
+# 6. 캐시 HIT인데 왜 Status Code는 200인가
+
+실제 서비스의 개발자도구 Network 탭을 열어보면 다음과 같은 응답을 볼 수 있다.
+
+![](https://velog.velcdn.com/images/eunwoo1341/post/a96a67d1-62b8-453b-b004-146a8006c5ab/image.png)
+
+여기서 헷갈렸던 부분은 “캐시 HIT이면 304가 나와야 하는 것 아닌가?”였다. 결과는 아니었다. 캐시 HIT이어도 Status Code는 그대로 200 OK가 맞다.
+
+핵심은 두 개념을 분리해서 봐야 한다는 점이다.
+
+```text
+Status Code 200 OK
+→ 요청한 HTML을 정상적으로 응답했다는 HTTP 상태 코드
+
+X-Cache: Hit from cloudfront
+→ 그 200 응답을 Origin 서버가 아니라 CloudFront 캐시에서 내려줬다는 의미
+```
+
+즉 위 응답은 다음 조합으로 이루어져 있다.
+
+```text
+Status Code: 200 OK
+X-Cache: Hit from cloudfront
+Age: 40
+Via: ... cloudfront.net
+```
+
+이걸 풀어보면 "CloudFront 엣지 캐시에 저장되어 있던 HTML 200 응답을 그대로 내려준 상태"라는 뜻이다.
+
+## Cache-Control과 Age로 판단하는 법
+
+여기서 실제로 캐시가 살아있는지 판단하려면 다음 두 헤더를 같이 봐야 한다.
+
+```text
+Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=31536000
+Age: 40
+```
+
+각 값의 의미는 다음과 같다.
+
+```text
+max-age=0
+→ 브라우저 캐시는 즉시 stale 처리
+
+s-maxage=60
+→ CloudFront 같은 shared cache(CDN)는 60초 동안 캐시 가능
+
+Age: 40
+→ 이 응답이 CloudFront 캐시에 저장된 지 약 40초 지났다는 의미
+```
+
+`s-maxage=60`이고 `Age`가 40이라면 아직 캐시 유효 시간 안쪽이다. 그래서 CloudFront는 Origin까지 갈 필요 없이 캐시에 있던 응답을 곧바로 내려준 것이다.
+
+정리하면 다음과 같다.
+
+```text
+200 OK                     → 응답 성공
+X-Cache: Hit from cloudfront → CloudFront 캐시에서 응답
+X-Cache: Miss from cloudfront → 캐시에 없어서 Origin까지 갔다 옴
+Age                         → 캐시에 저장된 후 지난 시간
+```
+
+## 304와 혼동하기 쉬운 이유
+
+“캐시 HIT = 304”라고 생각하기 쉬운 이유는, 브라우저 캐시 재검증(revalidation) 흐름과 CDN 캐시 흐름을 같은 개념으로 섞어서 이해하기 때문이다.
+
+```text
+304 Not Modified
+→ 브라우저(또는 캐시)가 이미 가진 리소스를 조건부 요청으로 재검증했을 때,
+  "너가 가진 거 아직 써도 된다"고 응답하는 상태
+
+200 OK + X-Cache: Hit from cloudfront
+→ CloudFront가 캐시된 응답 본문을 애초에 그대로 내려주는 상태
+```
+
+CloudFront가 캐시된 HTML을 직접 내려줄 때는 본문을 실제로 전송하는 것이기 때문에 304가 아니라 200이 나오는 것이 자연스럽다. 304는 조건부 요청(`If-None-Match`, `If-Modified-Since`)에 대한 응답일 때 나오는 상태 코드이고, CloudFront 캐시 HIT는 그 요청/응답 흐름 자체가 다르다.
+
 # 마무리
 
 이번 경험을 통해 CloudFront는 단순히 정적 파일을 빠르게 내려주는 CDN이 아니라는 점을 체감했다.
