@@ -2,7 +2,7 @@
 title: '[GraphQL] REST API 대신 GraphQL + Apollo Client를 사용하는 이유와 실무 도입기'
 author: 'Eunwoo'
 thumbnail: '/thumbnail/etc/graphql.webp'
-publishDate: '2026-07-05'
+publishDate: '2026-07-08'
 categoryId: 6
 keywords: ['GraphQL', 'Apollo Client', 'React', 'Codegen', 'SSR', 'Cache', 'Frontend']
 description: '화면이 늘어날수록 REST API가 힘들어지는 이유부터, GraphQL과 Apollo Client를 도입하며 겪은 역할·문법·코드젠·캐시·인증·SSR 패턴까지 처음 보는 사람도 이해할 수 있게 정리합니다.'
@@ -188,14 +188,14 @@ GraphQL Schema → .gql query/mutation → graphql-codegen → TypeScript 타입
 GraphQL이 REST보다 항상 좋은 것은 아니다.
 
 | 항목          | REST API            | GraphQL                    |
-| ------------- | -------------------- | --------------------------- |
-| 진입장벽      | 낮음                 | 상대적으로 높음             |
-| API 구조      | URL 중심             | Schema 중심                 |
-| 응답 형태     | 서버가 고정          | 클라이언트가 선택           |
-| 캐싱          | HTTP 캐시와 잘 맞음  | 클라이언트 캐시 설계 필요   |
-| 타입 자동화   | 별도 도구 필요       | Codegen과 잘 맞음            |
-| 서버 구현     | 비교적 단순          | Resolver, Schema 설계 필요  |
-| 프론트 생산성 | API 설계에 의존      | 화면 기준 query 작성 가능   |
+| ------------- | ------------------- | -------------------------- |
+| 진입장벽      | 낮음                | 상대적으로 높음            |
+| API 구조      | URL 중심            | Schema 중심                |
+| 응답 형태     | 서버가 고정         | 클라이언트가 선택          |
+| 캐싱          | HTTP 캐시와 잘 맞음 | 클라이언트 캐시 설계 필요  |
+| 타입 자동화   | 별도 도구 필요      | Codegen과 잘 맞음          |
+| 서버 구현     | 비교적 단순         | Resolver, Schema 설계 필요 |
+| 프론트 생산성 | API 설계에 의존     | 화면 기준 query 작성 가능  |
 
 schema, query, mutation, fragment, resolver, Apollo Cache, fetchPolicy, SSR hydration까지 알아야 할 개념이 늘어나므로 처음에는 REST보다 어렵게 느껴질 수 있다. 하지만 대규모 서비스, 여러 화면, 여러 도메인, 타입 안정성이 중요한 프론트엔드에서는 장점이 커진다.
 
@@ -283,11 +283,11 @@ query PostDetail($postId: ID!) {
 }
 ```
 
-| 문법                | 의미                        |
-| ------------------- | --------------------------- |
-| `$postId`           | GraphQL 변수                |
-| `ID!`               | null이 될 수 없는 ID 타입   |
-| `post(id: $postId)` | post 필드에 id 인자를 전달  |
+| 문법                | 의미                       |
+| ------------------- | -------------------------- |
+| `$postId`           | GraphQL 변수               |
+| `ID!`               | null이 될 수 없는 ID 타입  |
+| `post(id: $postId)` | post 필드에 id 인자를 전달 |
 
 프론트엔드에서는 `variables`로 값을 넘긴다.
 
@@ -399,10 +399,10 @@ query PostCard($postId: ID!) {
 }
 ```
 
-| 종류                | 위치                     | 역할                                        |
-| ------------------- | ------------------------ | -------------------------------------------- |
-| 서버 resolver       | 백엔드 GraphQL 서버      | DB, 외부 API에서 데이터 조회                 |
-| 클라이언트 resolver | 프론트엔드 Apollo Client | 서버 스키마에 없는 값을 프론트에서 계산      |
+| 종류                | 위치                     | 역할                                    |
+| ------------------- | ------------------------ | --------------------------------------- |
+| 서버 resolver       | 백엔드 GraphQL 서버      | DB, 외부 API에서 데이터 조회            |
+| 클라이언트 resolver | 프론트엔드 Apollo Client | 서버 스키마에 없는 값을 프론트에서 계산 |
 
 ---
 
@@ -481,15 +481,15 @@ rover graph fetch $APOLLO_GRAPH_REF --output src/graphql/scheme.graphql
 
 ## 정리: 누가 만드는가
 
-| 단계           | 산출물                                   | 만드는 주체                          |
-| -------------- | ----------------------------------------- | ------------------------------------- |
-| 스키마 정의    | `scheme.graphql`                          | **백엔드** (프론트는 rover로 fetch만) |
-| rover CLI      | `rover` 명령                              | Apollo 제공 (설치만)                  |
-| fetch 스크립트 | `gqlgen.sh`                               | **프론트 개발자 작성**                |
-| codegen 설정   | `codegen.cjs`                             | **프론트 개발자 작성**                |
-| 타입/훅        | `typeGenerated.ts`, `gqlGenerated.ts`     | codegen 자동 생성 (직접 수정 X)       |
-| 쿼리           | `*.graphql`                               | **프론트 개발자 작성**                |
-| 런타임 설정    | `src/apollo/*`                            | **프론트 개발자 작성**                |
+| 단계           | 산출물                                | 만드는 주체                           |
+| -------------- | ------------------------------------- | ------------------------------------- |
+| 스키마 정의    | `scheme.graphql`                      | **백엔드** (프론트는 rover로 fetch만) |
+| rover CLI      | `rover` 명령                          | Apollo 제공 (설치만)                  |
+| fetch 스크립트 | `gqlgen.sh`                           | **프론트 개발자 작성**                |
+| codegen 설정   | `codegen.cjs`                         | **프론트 개발자 작성**                |
+| 타입/훅        | `typeGenerated.ts`, `gqlGenerated.ts` | codegen 자동 생성 (직접 수정 X)       |
+| 쿼리           | `*.graphql`                           | **프론트 개발자 작성**                |
+| 런타임 설정    | `src/apollo/*`                        | **프론트 개발자 작성**                |
 
 한 문장으로 요약하면: 백엔드가 만든 스키마를 rover로 내려받고, codegen이 그 스키마와 내 쿼리를 읽어 타입·훅을 자동 생성하고, Apollo Client가 그 훅으로 실제 통신을 담당한다 — 이 셋을 `npm run gqlgen` + `src/apollo/` 설정으로 엮는 것이 전부다.
 
@@ -520,11 +520,11 @@ export const apolloClient = new ApolloClient({
 });
 ```
 
-| 코드            | 역할                                      |
-| --------------- | ------------------------------------------ |
-| `ApolloClient`  | GraphQL 요청과 캐시를 관리하는 핵심 객체   |
-| `HttpLink`      | 실제 GraphQL HTTP 요청을 보내는 Link       |
-| `InMemoryCache` | GraphQL 응답을 메모리에 정규화해서 저장    |
+| 코드            | 역할                                     |
+| --------------- | ---------------------------------------- |
+| `ApolloClient`  | GraphQL 요청과 캐시를 관리하는 핵심 객체 |
+| `HttpLink`      | 실제 GraphQL HTTP 요청을 보내는 Link     |
+| `InMemoryCache` | GraphQL 응답을 메모리에 정규화해서 저장  |
 
 React에서 Apollo Hook을 쓰려면 컴포넌트 트리 상단에 `ApolloProvider`가 있어야 한다.
 
@@ -721,13 +721,13 @@ const { data } = useUserPostsQuery({
 
 Apollo Client는 기본적으로 `cache-first` 전략을 쓴다. 자주 쓰는 `fetchPolicy`는 다음과 같다.
 
-| fetchPolicy         | 설명                                            | 사용 예시                    |
-| ------------------- | ------------------------------------------------ | ----------------------------- |
-| `cache-first`       | 캐시에 있으면 캐시 사용, 없으면 네트워크 요청    | 일반 상세 조회                |
-| `network-only`      | 항상 네트워크 요청                               | 최신성이 중요한 데이터        |
-| `cache-and-network` | 캐시를 먼저 보여주고 동시에 네트워크 요청        | 빠른 표시 + 최신화            |
-| `no-cache`          | 응답을 캐시에 저장하지 않음                      | 일회성 요청                   |
-| `cache-only`        | 캐시만 읽음                                      | 이미 캐시에 있다고 확신할 때  |
+| fetchPolicy         | 설명                                          | 사용 예시                    |
+| ------------------- | --------------------------------------------- | ---------------------------- |
+| `cache-first`       | 캐시에 있으면 캐시 사용, 없으면 네트워크 요청 | 일반 상세 조회               |
+| `network-only`      | 항상 네트워크 요청                            | 최신성이 중요한 데이터       |
+| `cache-and-network` | 캐시를 먼저 보여주고 동시에 네트워크 요청     | 빠른 표시 + 최신화           |
+| `no-cache`          | 응답을 캐시에 저장하지 않음                   | 일회성 요청                  |
+| `cache-only`        | 캐시만 읽음                                   | 이미 캐시에 있다고 확신할 때 |
 
 `onCompleted`, `onError` 콜백도 쓸 수 있지만, 비즈니스 로직을 여기 너무 많이 넣으면 컴포넌트 흐름이 복잡해질 수 있다.
 
@@ -756,10 +756,10 @@ export function CommentForm({ postId }: { postId: string }) {
 mutation 후 UI를 최신화하는 방법은 크게 세 가지다.
 
 | 상황                        | 추천                 |
-| --------------------------- | --------------------- |
-| 단순하고 안정성이 중요      | `refetchQueries`       |
-| 네트워크 비용을 줄이고 싶음 | `cache.modify`         |
-| 즉시 반응해야 하는 UI       | `optimisticResponse`   |
+| --------------------------- | -------------------- |
+| 단순하고 안정성이 중요      | `refetchQueries`     |
+| 네트워크 비용을 줄이고 싶음 | `cache.modify`       |
+| 즉시 반응해야 하는 UI       | `optimisticResponse` |
 
 **refetchQueries**는 지정한 query를 mutation 성공 후 다시 요청한다. 구현이 단순하지만 네트워크 요청이 다시 발생한다.
 
@@ -985,13 +985,13 @@ src/graphql/
             └── createComment.gql
 ```
 
-| 파일/폴더          | 역할                                     |
-| ------------------- | ----------------------------------------- |
-| `schema.graphql`   | 서버 GraphQL 스키마                       |
-| `gqlGenerated.ts`  | 자동 생성된 React Hook                    |
-| `typeGenerated.ts` | 자동 생성된 TypeScript 타입               |
-| `gql/`             | 직접 작성하는 query, mutation, fragment   |
-| `mutation/`        | 데이터를 변경하는 operation 분리          |
+| 파일/폴더          | 역할                                    |
+| ------------------ | --------------------------------------- |
+| `schema.graphql`   | 서버 GraphQL 스키마                     |
+| `gqlGenerated.ts`  | 자동 생성된 React Hook                  |
+| `typeGenerated.ts` | 자동 생성된 TypeScript 타입             |
+| `gql/`             | 직접 작성하는 query, mutation, fragment |
+| `mutation/`        | 데이터를 변경하는 operation 분리        |
 
 ## 새 API를 추가하는 실무 흐름
 
